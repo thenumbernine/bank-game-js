@@ -1,0 +1,169 @@
+<!doctype html>
+<html>
+	<head>
+		<meta charset='utf-8'/>
+		<meta name="inmobi-site-verification" content="85c05d7efa9313501a25d92f5bba38bf" />	
+		<title>Bank</title>
+		<meta name="inmobi-site-verification" content="87a9f5b4915071986d1beb3eb7937751" />		
+		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+		<meta name="apple-mobile-web-app-capable" content="yes"/>
+		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+		
+		<link rel="stylesheet" text="text/css" href="jquery.mobile-1.4.5.css"/>
+		<link rel="stylesheet" text="text/css" href="style.css"/>
+		
+		<script type="text/javascript" src="/js/jquery-1.11.1.min.js"></script>
+		<script type="text/javascript" src="/js/purl.js"></script>
+		<script type="text/javascript" src="/js/util.js"></script>
+		<script type="text/javascript" src="/js/vec.js"></script>
+		<script type="text/javascript">
+$(document).bind('mobileinit', function() {
+	$.mobile.selectmenu.prototype.options.nativeMenu = false;
+	$.mobile.listview.prototype.options.dividerTheme = 'a';
+	$.mobile.hashListeningEnabled = false;			//select box change thing does url change
+	$.mobile.changePage.defaults.changeHash = false;	//clicking a button does a url change
+	$.mobile.changePage.defaults.transition = 'flip';
+	$.mobile.changePage.defaults.allowSamePageTransition = true;
+});
+		</script>
+		<script type="text/javascript" src="jquery.mobile-1.4.5.js"></script>
+		<script type="text/javascript" src="main.js"></script>
+	
+		<script type="text/javascript">
+			var _gaq = _gaq || [];
+			_gaq.push(['_setAccount', 'UA-17312646-3']);
+			_gaq.push(['_trackPageview']);
+			(function() {
+			var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+			ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+			var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+			})();
+		</script>
+
+	</head>
+	<body>
+		<div id='loading-page' class='page' data-role='page'>
+			<div data-role='header'><h1>Bank</h1></div>
+			<div data-role='content'>
+				Loading...<br>
+				<progress id='loading' max='100' value='0'></progress>
+			</div>
+		</div>
+		<div id='splash-page' class='page' data-role='page'>
+			<div data-role='header'><h1>Bank</h1></div>
+			<div data-role='content'>
+				<button data-inline='true' onclick='splash.start()'>Start</button>
+				<button data-inline='true' onclick='chooseLevels.show()'>Levels</button>
+			</div>
+		</div>
+		<div id='level-page' class='page' data-role='page'>
+			<div data-role='header'><h1>Levels</h1></div>
+			<div data-role='content'>
+				<div id='level-page-content'></div>
+				<button data-inline='true' onclick='splash.show()'>Back</button>
+			</div>
+		</div>
+		<div id='editor-page' class='page' data-role='page'>
+			<div data-role='content'>
+				<div style='position:absolute; z-index:1; right:0px'>
+					<img onclick='splash.show()' src='close.png'/><br>
+					<button data-inline='true' onclick='editor.play()'>Play!</button><br>
+					<button data-inline='true' onclick='editor.save()'>Save</button><br>
+					<button data-inline='true' onclick='editor.submit()'>Submit</button><br>
+				</div>
+				<div style='position:absolute; z-index:1; right:0px; bottom:0px'>
+					<select id='editor-select'>
+						<option value='..'>empty</option>
+						<option value='**'>brick</option>
+						<option value='##'>stone</option>
+						<option value='=='>water</option>
+						<option value='&amp;&amp;'>tree</option>
+						<option value='P '>start</option>
+						<option value='K '>key</option>
+						<option value='F '>push block</option>
+						<option value='G '>gun</option>
+						<option value='S '>sentry</option>
+						<option value='M0'>money + 0 bombs</option>
+						<option value='M1'>money + 1 bombs</option>
+						<option value='M2'>money + 2 bombs</option>
+						<option value='M3'>money + 3 bombs</option>
+						<option value='M4'>money + 4 bombs</option>
+						<option value='M5'>money + 5 bombs</option>
+						<option value='M6'>money + 6 bombs</option>
+						<option value='M7'>money + 7 bombs</option>
+						<option value='M8'>money + 8 bombs</option>
+						<option value='M9'>money + 9 bombs</option>
+						<!-- option value='MG'>money + gloves</option -->
+						<option value='B0'>bomb with 0 radius</option>
+						<option value='B1'>bomb with 1 radius</option>
+						<option value='B2'>bomb with 2 radius</option>
+						<option value='B3'>bomb with 3 radius</option>
+						<option value='B4'>bomb with 4 radius</option>
+						<option value='B5'>bomb with 5 radius</option>
+						<option value='B6'>bomb with 6 radius</option>
+						<option value='B7'>bomb with 7 radius</option>
+						<option value='B8'>bomb with 8 radius</option>
+						<option value='B9'>bomb with 9 radius</option>
+					</select>
+				</div>
+				<canvas id='editor-canvas' style='position:absolute'>
+					<img src='bank.png'/>
+				</canvas><br>
+				<br>
+<pre style='text-align:left'>
+Key:
+..    empty
+**    brick
+##    stone
+==    water
+&amp;&amp;    tree
+P     player start
+M0-M9 money with 0-9 bombs
+K     key
+B0-B9 bomb with 0-9 blast radius 
+F     push block
+G     gun
+S     sentry
+</pre>
+			</div>
+		</div>
+		<div id='game-page' class='page' style='overflow:hidden' data-role='page'>
+			<div data-role='content'>
+				<div style='position:absolute; z-index:2; right:0px; top:0px'>
+					<img width=30 style='padding:5px' src='images/menu.png' onclick='$("#dropdown").toggle()'/><br>
+					<div id='dropdown' style='display:none; position:absolute; z-index:3; right:0px'>
+						<button onclick='Game.prototype.skip()'>Skip</button>
+						<button onclick='Game.prototype.restart()'>Restart</button>
+						<input type='checkbox' id='gamepad-checkbox' onchange='Game.prototype.gamepadToggle()'/>
+						<label for='gamepad-checkbox'>Gamepad</label>
+						<button data-role='inline' onclick='editor.edit()'>Edit</button>
+						<button data-role='inline' onclick='Game.prototype.close()'>Back</button>
+					</div>	
+				</div>
+				<div id='game-stats' style='position:absolute; z-index:1; left:0px; bottom:0px'>
+					<span id='game-hud-bombs'></span> Bombs<br>
+					Level <span id='game-hud-level'></span><br>
+				</div>
+		
+		<div style='margin:auto; text-align:center' class='inmobi-ad'>
+			<script type="text/javascript">
+var inmobi_conf = {
+	siteid : "92a7545232e14198a66c31e01119c2cc",
+	slot : "15",
+	test:false,
+	autoRefresh:20,
+	sticky:'top',
+	targetWindow:'_blank'
+};
+			</script>
+			<script type="text/javascript" src="http://cf.cdn.inmobi.com/ad/inmobi.js"></script>
+		</div>
+			
+				
+				<canvas id='game-canvas' style='position:absolute'>
+					<img src='bank.png'/>
+				</canvas>
+			</div>
+		</div>
+	</body>
+</html>
