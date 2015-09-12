@@ -9,7 +9,6 @@ return {
 			["Content-type"] = "text/javascript",
 			["Cache-Control"] = "no-cache",
 		}
-		local headers = { ["Content-type"] = "text/javascript" }
 		local req = wsapi_request.new(env)
 		local score = req.GET and req.GET.score
 		local name = req.GET and req.GET.name

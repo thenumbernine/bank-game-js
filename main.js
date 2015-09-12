@@ -1544,7 +1544,8 @@ var Game = makeClass({
 
 	//static
 	gamepadToggle : function() {
-		if ($('#gamepad-checkbox').attr('checked') == 'checked') {
+		if ($('#gamepad-checkbox').is(':checked')) {
+console.log('here');
 			showButtons();
 		} else {
 			hideButtons();
