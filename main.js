@@ -82,7 +82,9 @@ var Animation = makeClass({
 	
 	SEQ_GLOVE : 21,
 	
-	SEQ_COUNT : 22, 	
+	SEQ_CLOUD: 22,
+	
+	SEQ_COUNT : 23, 	
 
 	init : function() {
 		for (var i = 0; i < this.framesForSeq.length; i++) {
@@ -155,7 +157,7 @@ Animation.prototype.frames = [
 	new Frame('bomb_sunk', 1, 0, Animation.prototype.SEQ_BOMB_SUNK),
 	
 	//spark
-	new Frame('flame', 1, 0, Animation.prototype.SEQ_SPARK),
+	new Frame('dot', 1, 0, Animation.prototype.SEQ_SPARK),
 	
 	//framer
 	new Frame('framer', 1, 0, Animation.prototype.SEQ_FRAMER),
@@ -169,7 +171,10 @@ Animation.prototype.frames = [
 	new Frame('sentry2', 3, -1),
 	
 	//glove
-	new Frame('gloves', 1, 0, Animation.prototype.SEQ_GLOVE)
+	new Frame('gloves', 1, 0, Animation.prototype.SEQ_GLOVE),
+	
+	//glove
+	new Frame('cloud', 1, 0, Animation.prototype.SEQ_CLOUD)
 ];
 
 var GameNumbers = makeClass(new (function(){
@@ -225,6 +230,8 @@ GameText.prototype = {
 
 var AnimatedObj = makeClass(new (function(){
 
+	this.scale = new vec2(1,1);
+
 	this.frameId = 0;	//index into frametable
 	this.frameTime = 0;	//measured in fps intervals, i.e. frames
 	
@@ -274,6 +281,8 @@ var BaseObj = makeClass(new (function(){
 	this.isBlocking = true;
 	this.isBlockingPushers = true;
 	this.blocksExplosion = true;
+		
+	this.blend = 'none';
 
 	//helpful for subclasses.  TODO - move somewhere else
 	this.linfDist = function(ax, ay, bx, by) {
@@ -298,18 +307,41 @@ var BaseObj = makeClass(new (function(){
 	
 	this.drawSprite = function(c, rect) {
 		if (this.frameId < 0 || this.frameId >= anim.frames.length) return;
+		
 		var paddingX = c.canvas.width - game.MAP_WIDTH * game.TILE_WIDTH;
-		rect.left = ((this.posX - .5) * game.TILE_WIDTH) + paddingX;
-		rect.right = rect.left + game.TILE_WIDTH;
-		rect.top = (this.posY - .5) * game.TILE_HEIGHT;
-		rect.bottom = rect.top + game.TILE_HEIGHT;
+		
+		rect.left = (this.posX - .5 * this.scale.x) * game.TILE_WIDTH + paddingX;
+		rect.right = rect.left + game.TILE_WIDTH * this.scale.x;
+		rect.top = (this.posY - .5 * this.scale.y) * game.TILE_HEIGHT;
+		rect.bottom = rect.top + game.TILE_HEIGHT * this.scale.y;
+		
 		var frame = anim.frames[this.frameId];
 		if (!frame) throw 'failed to find frame for id '+this.frameId;
+		
 		var bitmap = frame.bitmap;
 		if (!bitmap) throw 'failed to find bitmap for frame '+this.frameId;
+
+		if (this.blend == 'add') {
+			c.globalCompositeOperation = 'lighter';
+		} else {
+			c.globalCompositeOperation = 'source-over';
+		}
+	
+		if (this.color !== undefined) {
+			c.fillStyle = 'rgba('
+				+parseInt(this.color.x*255)+','
+				+parseInt(this.color.y*255)+','
+				+parseInt(this.color.z*255)+','
+				+parseInt(this.color.w*255)+')';
+		}
+
 		c.drawImage(bitmap, 
 			rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top
 		);
+		
+		c.fillStyle = null;
+		
+		c.globalCompositeOperation = 'source-over';
 	};
 	
 	//whether sentry can walk over it
@@ -592,36 +624,69 @@ var PushableObj = makeClass(new (function(){
 	};
 })());
 
+//TODO alpha test, and threshold alpha at .5 or something
+var Cloud = makeClass(new (function(){
+	this.super = BaseObj;
+	this.isBlocking = false;
+	this.isBlockingPushers = false;
+	this.blocksExplosion = false;
+
+	this.init = function(args) {
+		Cloud.super.call(this);
+		this.vel = args.vel;
+		this.life = args.life;
+		this.scale = new vec2(args.scale, args.scale),
+		this.setPos(args.pos.x, args.pos.y);
+		this.startTimeMS = game.gameTime;
+		this.setSeq(Animation.prototype.SEQ_CLOUD);
+		this.color = new vec4(1,1,1,1);
+	};
+
+	this.update = function(deltaTimeMS) {
+		Cloud.superProto.update.call(this, deltaTimeMS);
+
+		var dt = deltaTimeMS / 1000;
+		this.setPos(this.posX + dt * this.vel.x, this.posY + dt * this.vel.y);
+
+		var frac = (game.gameTime - this.startTimeMS)/1000 / this.life;
+		if (frac > 1) frac = 1;
+		this.color.w = (1-frac)*(1-frac);
+
+		if (frac == 1) {
+			game.removeObj(this);
+			return;
+		}
+	};
+})());
+
 var Particle = makeClass(new (function(){
 	this.super = BaseObj;
+	this.isBlocking = false;
+	this.isBlockingPushers = false;
+	this.blocksExplosion = false;
+	this.blend = 'add';
 
 	this.init = function(args) {
 		Particle.super.call(this);
-		this.vel = new vec2(args.vel[0], args.vel[1]);
+		this.vel = args.vel;
 		this.life = args.life;	//in seconds
-		this.srccolor = args.color;
-		this.color = args.color;
+		this.srccolor = new vec4(args.color);
+		this.color = new vec4(args.color);
 		this.scale = new vec2(args.radius * 2, args.radius * 2);
 		this.setPos(args.pos.x, args.pos.y);
-		//this.setBlend(BLEND_ADD);
-
-		this.setSeq(Animation.prototype.SEQ_SPARK);
 		this.startTimeMS = game.gameTime;
-
-		this.isBlocking = false;
-		this.isBlockingPushers = false;
-		this.blocksExplosion = false;
+		this.setSeq(Animation.prototype.SEQ_SPARK);
 	};
 	
 	this.update = function(deltaTimeMS) {
 		Particle.superProto.update.call(this, deltaTimeMS);
 
 		var dt = deltaTimeMS / 1000;
-		this.setPos(this.vel.x * dt + this.posX, this.vel.y * dt + this.posY);
+		this.setPos(this.posX + dt * this.vel.x, this.posY + dt * this.vel.y);
 
 		var frac = 1 - (game.gameTime - this.startTimeMS)/1000 / this.life;
 		if (frac < 0) frac = 0;
-		this.color[3] = this.srccolor[3] * frac;
+		this.color.w = this.srccolor.w * frac;
 
 		if (frac == 0) {
 			game.removeObj(this);
@@ -857,7 +922,8 @@ var Bomb = makeClass(new (function(){
 		
 		//if state is idle...
 		if (this.state == this.STATE_LIVE) {
-			var t = game.gameTime - this.boomTimeMS;
+			var t = (game.gameTime - this.boomTimeMS) / 1000;
+			this.scale = new vec2(Math.cos(2*t*Math.PI)*.2+.9);
 			if (t >= 0) {
 				this.explode();
 			}
@@ -925,7 +991,17 @@ var Bomb = makeClass(new (function(){
 	};
 	
 	this.explode = function() {
-	
+
+		for (var i = 0; i < 10; ++i) {
+			var scale = Math.random() * 2;
+			game.addObj(new Cloud({
+				pos : new vec2(this.posX, this.posY),
+				vel : new vec2(Math.random()*2-1, Math.random()*2-1),
+				scale : new vec2(scale+1, scale+1),
+				life : 5 - scale
+			}))
+		}
+
 		//if a bomb is half off in either direction then it can't destroy tiles
 		//hmm the half tiles is a lolo issue ... 
 		//maybe for bomberman's sake we should snap to tiles? or only allow blocks
@@ -1008,16 +1084,16 @@ var Bomb = makeClass(new (function(){
 	};
 	
 	this.makeSpark = function(x, y) {
-		for (var i = 0; i < 10; ++i) {
+		//for (var i = 0; i < 10; ++i) {
+		for (var i = 0; i < 3; ++i) {
 			var c = Math.random();
-			var particle = new Particle({
+			game.addObj(new Particle({
 				vel : new vec2(Math.random()*2-1, Math.random()*2-1),
 				pos : new vec2(x,y),
 				life : Math.random() * .5 + .5,
-				color : [1,c,c*Math.random()*Math.random(),1],
-				radius : .5 * Math.random() + .25
-			});
-			game.addObj(particle);
+				color : new vec4(1,c,c*Math.random()*Math.random(),1),
+				radius : Math.random() + .5
+			}));
 		}
 	};
 })());
@@ -1499,7 +1575,7 @@ var Game = makeClass({
 	sysTime : 0,
 	lastSysTime : 0,
 	accruedTime : 0,
-	UPDATE_DURATION : 1000/100,
+	UPDATE_DURATION : 1000/50,
 	gameTime : 0,
 
 	loadLevelRequest : false,
