@@ -26,7 +26,7 @@ return {
 			end
 			leveldb = leveldb or {levels={}}
 			table.insert(leveldb.levels, {name=name, tiles=tiles})
-			io.writefile(fn, json.encode(leveldb))
+			file[fn] = json.encode(leveldb, {indent=true})
 			text = function() coroutine.yield(json.encode{result='win'}) end
 		else
 			text = function() coroutine.yield(json.encode{result='fail'}) end
@@ -35,4 +35,3 @@ return {
 		return 200, headers, coroutine.wrap(text)
 	end
 }
-
