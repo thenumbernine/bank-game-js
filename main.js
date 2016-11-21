@@ -4,8 +4,6 @@ function Rect() {
 	this.top = 0;
 	this.bottom = 0;
 }
-	
-var FIXED_PREC = 1024;
 
 var Dir = {
 	NONE : -1,
@@ -189,9 +187,9 @@ var GameNumbers = makeClass(new (function(){
 			var bitmap = this.bitmaps[frame];
 			if (!bitmap) continue;
 			
-			rect.left = ((x - FIXED_PREC / 2 + (i+.25) * FIXED_PREC) * game.TILE_WIDTH) / FIXED_PREC + paddingX;
+			rect.left = (x + i - .25) * game.TILE_WIDTH + paddingX;
 			rect.right = rect.left + game.TILE_WIDTH/2;
-			rect.top = ((y - FIXED_PREC / 2 + .25 * FIXED_PREC) * game.TILE_HEIGHT) / FIXED_PREC;
+			rect.top = (y - .25) * game.TILE_HEIGHT;
 			rect.bottom = rect.top + game.TILE_HEIGHT/2;
 
 			c.drawImage(bitmap, 
@@ -217,8 +215,8 @@ GameText.prototype = {
 		var paddingX = c.canvas.width - game.MAP_WIDTH * game.TILE_WIDTH;
 		var canvasPos = $(c.canvas).position();
 		this.span.get(0).style.fontSize = parseInt(game.TILE_HEIGHT/2)+'px';
-		this.span.get(0).style.left = parseInt(canvasPos.left + ((posX - FIXED_PREC / 4) * game.TILE_WIDTH) / FIXED_PREC + paddingX);
-		this.span.get(0).style.top = parseInt(canvasPos.top + ((posY + FIXED_PREC / 4) * game.TILE_HEIGHT) / FIXED_PREC - game.TILE_HEIGHT/2);
+		this.span.get(0).style.left = parseInt(canvasPos.left + ((posX - .25) * game.TILE_WIDTH) + paddingX);
+		this.span.get(0).style.top = parseInt(canvasPos.top + ((posY + .25) * game.TILE_HEIGHT) - game.TILE_HEIGHT/2);
 		this.span.text(''+text);
 	},
 	remove : function() { this.span.remove(); }
@@ -235,8 +233,8 @@ var AnimatedObj = makeClass(new (function(){
 	this.update = function(deltaTimeMS) {
 		if (this.frameId < 0 || this.frameId >= anim.frames.length) return;
 		var frame = anim.frames[this.frameId];
-		this.frameTime++;
-		if (this.frameTime < frame.duration) return;
+		this.frameTime += deltaTimeMS;
+		if (this.frameTime < frame.duration * 1000/33) return;
 		this.setFrame(this.frameId + frame.frameChange);
 	};
 	
@@ -279,10 +277,10 @@ var BaseObj = makeClass(new (function(){
 
 	//helpful for subclasses.  TODO - move somewhere else
 	this.linfDist = function(ax, ay, bx, by) {
-		ax = parseInt(ax);
-		ay = parseInt(ay);
-		bx = parseInt(bx);
-		by = parseInt(by);
+		ax = parseInt(ax + .5);
+		ay = parseInt(ay + .5);
+		bx = parseInt(bx + .5);
+		by = parseInt(by + .5);
 		var dx = ax - bx;
 		var dy = ay - by;
 		var adx = dx < 0 ? -dx : dx;
@@ -291,8 +289,6 @@ var BaseObj = makeClass(new (function(){
 	};
 	
 	this.setPos = function(x, y) {
-		x = parseInt(x);
-		y = parseInt(y);
 		this.srcPosX = this.destPosX = x;
 		this.srcPosY = this.destPosY = y;
 		//the lua game didnt' do this..
@@ -303,9 +299,9 @@ var BaseObj = makeClass(new (function(){
 	this.drawSprite = function(c, rect) {
 		if (this.frameId < 0 || this.frameId >= anim.frames.length) return;
 		var paddingX = c.canvas.width - game.MAP_WIDTH * game.TILE_WIDTH;
-		rect.left = ((this.posX - FIXED_PREC / 2) * game.TILE_WIDTH) / FIXED_PREC + paddingX;
+		rect.left = ((this.posX - .5) * game.TILE_WIDTH) + paddingX;
 		rect.right = rect.left + game.TILE_WIDTH;
-		rect.top = ((this.posY - FIXED_PREC / 2) * game.TILE_HEIGHT) / FIXED_PREC;
+		rect.top = (this.posY - .5) * game.TILE_HEIGHT;
 		rect.bottom = rect.top + game.TILE_HEIGHT;
 		var frame = anim.frames[this.frameId];
 		if (!frame) throw 'failed to find frame for id '+this.frameId;
@@ -381,15 +377,15 @@ var MovableObj = makeClass(new (function(){
 	
 	this.lastMoveResponse = this.MOVE_RESPONSE_NO_MOVE;
 	this.moveCmd = Dir.NONE;
-	this.speed = 10 * FIXED_PREC;	//tiles covered per second
+	this.speed = 10;	//tiles covered per second
 	this.moveFracMoving = false;
 	this.moveFrac = 0;	//fixed precision
 	
 	this.moveIsBlocked_CheckHitWorld = function(whereX, whereY) {
-		var typeUL = game.getMapTypeIndex( (whereX - FIXED_PREC / 4) / FIXED_PREC, (whereY - FIXED_PREC / 4) / FIXED_PREC);
-		var typeUR = game.getMapTypeIndex( (whereX + FIXED_PREC / 4) / FIXED_PREC, (whereY - FIXED_PREC / 4) / FIXED_PREC);
-		var typeLL = game.getMapTypeIndex( (whereX - FIXED_PREC / 4) / FIXED_PREC, (whereY + FIXED_PREC / 4) / FIXED_PREC);
-		var typeLR = game.getMapTypeIndex( (whereX + FIXED_PREC / 4) / FIXED_PREC, (whereY + FIXED_PREC / 4) / FIXED_PREC);
+		var typeUL = game.getMapTypeIndex(whereX - .25, whereY - .25);
+		var typeUR = game.getMapTypeIndex(whereX + .25, whereY - .25);
+		var typeLL = game.getMapTypeIndex(whereX - .25, whereY + .25);
+		var typeLR = game.getMapTypeIndex(whereX + .25, whereY + .25);
 		//Log.w(this.getClass().getName(), "MovableObj.moveIsBlocked_CheckHitWorld types " + typeUL + " " + typeUR + " " + typeLL + " " + typeLR);
 		
 		return this.hitWorld(whereX, whereY, typeUL, typeUR, typeLL, typeLR);
@@ -403,20 +399,20 @@ var MovableObj = makeClass(new (function(){
 			if (o == thiz) return true;	//continue;
 			if (o.isa(Bomb) && o.state == o.STATE_SINKING) {
 				//if any of our corners are really standing on an egg rather than water then treat it like its empty
-				if (typeUL == Game.prototype.MAPTYPE_WATER && thiz.linfDist(o.destPosX, o.destPosY, whereX - FIXED_PREC / 4, whereY - FIXED_PREC / 4) < (FIXED_PREC / 2)) typeUL = Game.prototype.MAPTYPE_EMPTY;
-				if (typeUR == Game.prototype.MAPTYPE_WATER && thiz.linfDist(o.destPosX, o.destPosY, whereX + FIXED_PREC / 4, whereY - FIXED_PREC / 4) < (FIXED_PREC / 2)) typeUR = Game.prototype.MAPTYPE_EMPTY;
-				if (typeLL == Game.prototype.MAPTYPE_WATER && thiz.linfDist(o.destPosX, o.destPosY, whereX - FIXED_PREC / 4, whereY + FIXED_PREC / 4) < (FIXED_PREC / 2)) typeLL = Game.prototype.MAPTYPE_EMPTY;
-				if (typeLR == Game.prototype.MAPTYPE_WATER && thiz.linfDist(o.destPosX, o.destPosY, whereX + FIXED_PREC / 4, whereY + FIXED_PREC / 4) < (FIXED_PREC / 2)) typeLR = Game.prototype.MAPTYPE_EMPTY;
+				if (typeUL == Game.prototype.MAPTYPE_WATER && thiz.linfDist(o.destPosX, o.destPosY, whereX - .25, whereY - .25) < (.5)) typeUL = Game.prototype.MAPTYPE_EMPTY;
+				if (typeUR == Game.prototype.MAPTYPE_WATER && thiz.linfDist(o.destPosX, o.destPosY, whereX + .25, whereY - .25) < (.5)) typeUR = Game.prototype.MAPTYPE_EMPTY;
+				if (typeLL == Game.prototype.MAPTYPE_WATER && thiz.linfDist(o.destPosX, o.destPosY, whereX - .25, whereY + .25) < (.5)) typeLL = Game.prototype.MAPTYPE_EMPTY;
+				if (typeLR == Game.prototype.MAPTYPE_WATER && thiz.linfDist(o.destPosX, o.destPosY, whereX + .25, whereY + .25) < (.5)) typeLR = Game.prototype.MAPTYPE_EMPTY;
 			}
 		});
 		return MovableObj.superProto.hitWorld.call(this, whereX, whereY, typeUL, typeUR, typeLL, typeLR);
 	};
 	
 	this.moveIsBlocked_CheckEdge = function(newDestX, newDestY) {
-		if (newDestX < FIXED_PREC / 4 ||
-			newDestY < FIXED_PREC / 4 ||
-			newDestX > game.MAP_WIDTH * FIXED_PREC - FIXED_PREC / 4 ||
-			newDestY > game.MAP_HEIGHT * FIXED_PREC - FIXED_PREC / 4)
+		if (newDestX < .25 ||
+			newDestY < .25 ||
+			newDestX > game.MAP_WIDTH - .25 ||
+			newDestY > game.MAP_HEIGHT - .25)
 		{
 			return this.hitEdge(newDestX, newDestY);
 		}
@@ -425,7 +421,7 @@ var MovableObj = makeClass(new (function(){
 	
 	this.moveIsBlocked_CheckHitObject = function(o, cmd, newDestX, newDestY) {
 		//if o's bbox at its destpos touches ours at our destpos then
-		if (this.linfDist(o.destPosX, o.destPosY, newDestX, newDestY) > 3 * FIXED_PREC / 4) return false;
+		if (this.linfDist(o.destPosX, o.destPosY, newDestX, newDestY) > .75) return false;
 		
 		var response = this.hitObject(o, newDestX, newDestY, cmd);
 		
@@ -471,8 +467,8 @@ var MovableObj = makeClass(new (function(){
 		var newDestX = this.posX;
 		var newDestY = this.posY;
 		if (cmd >= 0 && cmd < Dir.COUNT) {
-			newDestX += Dir.vec[cmd][0] * FIXED_PREC / 2;
-			newDestY += Dir.vec[cmd][1] * FIXED_PREC / 2;
+			newDestX += Dir.vec[cmd][0] * .5;
+			newDestY += Dir.vec[cmd][1] * .5;
 		} else {
 			return this.MOVE_RESPONSE_NO_MOVE;
 		}
@@ -485,8 +481,8 @@ var MovableObj = makeClass(new (function(){
 		}
 		
 		//TODO - get this working? if it's even needed?  seems to be working fine without it ... (though things could drift...)
-		this.destPosX = newDestX & (~((FIXED_PREC / 2) - 1));	//notice, this will only be floor() for positive values
-		this.destPosY = newDestY & (~((FIXED_PREC / 2) - 1));	//good thing we never allow any negative ones
+		this.destPosX = newDestX;	//notice, this will only be floor() for positive values
+		this.destPosY = newDestY;	//good thing we never allow any negative ones
 		this.moveFrac = 0;
 		this.moveFracMoving = true;
 		
@@ -508,7 +504,7 @@ var MovableObj = makeClass(new (function(){
 		if (this.moveFracMoving) {
 			this.moveFrac += deltaTimeMS * this.speed / 1000;	//1000 to convert from ms to seconds
 //			Log.w(this.getClass().getName(), "MovableObj.update moveFrac = " + moveFrac);
-			if (this.moveFrac >= FIXED_PREC) {
+			if (this.moveFrac >= 1) {
 //				Log.w(this.getClass().getName(), "MovableObj.update setting moveFracMoving = " + moveFracMoving);
 				this.moveFracMoving = false;
 				this.posX = this.destPosX;
@@ -520,15 +516,15 @@ var MovableObj = makeClass(new (function(){
 					if (o == thiz) return true;//continue;
 					
 					//if o's bbox at its destpos touches ours at our destpos then
-					if (this.linfDist(o.destPosX, o.destPosY, thiz.destPosX, thiz.destPosY) > 3 * FIXED_PREC / 4) return true;//continue;
+					if (this.linfDist(o.destPosX, o.destPosY, thiz.destPosX, thiz.destPosY) > .75) return true;//continue;
 					
 					o.endPush(thiz, thiz.destPosX, thiz.destPosY);
 				});
 
 			} else {
-				var oneMinusMoveFrac = FIXED_PREC - this.moveFrac;
-				this.posX = (this.destPosX * this.moveFrac + this.srcPosX * oneMinusMoveFrac) / FIXED_PREC;
-				this.posY = (this.destPosY * this.moveFrac + this.srcPosY * oneMinusMoveFrac) / FIXED_PREC;
+				var oneMinusMoveFrac = 1 - this.moveFrac;
+				this.posX = this.destPosX * this.moveFrac + this.srcPosX * oneMinusMoveFrac;
+				this.posY = this.destPosY * this.moveFrac + this.srcPosY * oneMinusMoveFrac;
 			}
 		}
 		
@@ -545,8 +541,6 @@ var PushableObj = makeClass(new (function(){
 	
 	this.startPush = function(pusher, pushDestX, pushDestY, side) {
 		var superResult = PushableObj.superProto.startPush.call(this, pusher, pushDestX, pushDestY, side);
-		pushDestX = parseInt(pushDestX);
-		pushDestY = parseInt(pushDestY);
 		
 //		Log.w(this.getClass().getName(), "PushableObj.startPush");
 		
@@ -567,7 +561,7 @@ var PushableObj = makeClass(new (function(){
 				break;
 			}
 			if (delta < 0) delta = -delta;
-			var align = delta < FIXED_PREC / 4;
+			var align = delta < .25;
 //			Log.w(this.getClass().getName(), "PushableObj.startPush align "+align);
 //			Log.w(this.getClass().getName(), "PushableObj.startPush moveFracMoving "+moveFracMoving);
 			
@@ -598,16 +592,21 @@ var PushableObj = makeClass(new (function(){
 	};
 })());
 
-var Spark = makeClass(new (function(){
+var Particle = makeClass(new (function(){
 	this.super = BaseObj;
 
-	this.durationMS = 500;
-	this.dieTimeMS = 0;
+	this.init = function(args) {
+		Particle.super.call(this);
+		this.vel = new vec2(args.vel[0], args.vel[1]);
+		this.life = args.life;	//in seconds
+		this.srccolor = args.color;
+		this.color = args.color;
+		this.scale = new vec2(args.radius * 2, args.radius * 2);
+		this.setPos(args.pos.x, args.pos.y);
+		//this.setBlend(BLEND_ADD);
 
-	this.init = function() {
-		Spark.super.call(this);
 		this.setSeq(Animation.prototype.SEQ_SPARK);
-		this.dieTimeMS = game.gameTime + this.durationMS;
+		this.startTimeMS = game.gameTime;
 
 		this.isBlocking = false;
 		this.isBlockingPushers = false;
@@ -615,10 +614,16 @@ var Spark = makeClass(new (function(){
 	};
 	
 	this.update = function(deltaTimeMS) {
-		Spark.superProto.update.call(this, deltaTimeMS);
+		Particle.superProto.update.call(this, deltaTimeMS);
 
-		var t = parseInt(game.gameTime - this.dieTimeMS);
-		if (t >= 0) {
+		var dt = deltaTimeMS / 1000;
+		this.setPos(this.vel.x * dt + this.posX, this.vel.y * dt + this.posY);
+
+		var frac = 1 - (game.gameTime - this.startTimeMS)/1000 / this.life;
+		if (frac < 0) frac = 0;
+		this.color[3] = this.srccolor[3] * frac;
+
+		if (frac == 0) {
 			game.removeObj(this);
 			return;
 		}
@@ -707,8 +712,8 @@ var Bomb = makeClass(new (function(){
 		this.posX = this.srcPosX = this.holder.destPosX;
 		this.posY = this.srcPosY = this.holder.destPosY;
 		
-		this.destPosX = this.srcPosX + Dir.vec[dir][0] * this.THROW_DIST * FIXED_PREC;
-		this.destPosY = this.srcPosY + Dir.vec[dir][1] * this.THROW_DIST * FIXED_PREC;
+		this.destPosX = this.srcPosX + Dir.vec[dir][0] * this.THROW_DIST;
+		this.destPosY = this.srcPosY + Dir.vec[dir][1] * this.THROW_DIST;
 		
 		this.holder = undefined;	//doesn't matter anymore
 		this.throwDone = game.gameTime + this.THROW_DURATION;
@@ -724,7 +729,7 @@ var Bomb = makeClass(new (function(){
 		this.state = this.STATE_LIVE;
 		this.boomTimeMS = game.gameTime + ms;
 	};
-
+	
 	//bombs can only pass thru empty and water
 	this.cannotPassThru = function(maptype) {
 		//if it doesn't blocks movement then we're good
@@ -736,7 +741,7 @@ var Bomb = makeClass(new (function(){
 		//(maybe make that a movement flag or something?)
 		return maptype != Game.prototype.MAPTYPE_WATER;
 	};
-
+	
 	this.drawSprite = function(c, rect) {
 		var x = this.posX;
 		var y = this.posY;
@@ -744,7 +749,7 @@ var Bomb = makeClass(new (function(){
 		//hack: push & pop position between draw cmd
 		//the other way: new method for underlying drawing of sprite that gets passed x,y
 		if (this.holder !== undefined) {
-			this.posY -= FIXED_PREC * 3 / 4;
+			this.posY -= .75;
 		}
 
 		Bomb.superProto.drawSprite.call(this, c, rect);
@@ -754,7 +759,7 @@ var Bomb = makeClass(new (function(){
 		}
 
 		if (this.holder !== undefined) {
-			this.posY += FIXED_PREC * 3 / 4;
+			this.posY += .75;
 		}
 	};
 
@@ -783,7 +788,7 @@ var Bomb = makeClass(new (function(){
 
 		//update the 'ownerStandingOn' flag for newly-dropped bombs
 		if (this.owner !== undefined && this.ownerStandingOn) {
-			if (this.linfDist(this.destPosX, this.destPosY, this.owner.destPosX, this.owner.destPosY) > 3 * FIXED_PREC / 4) {
+			if (this.linfDist(this.destPosX, this.destPosY, this.owner.destPosX, this.owner.destPosY) > .75) {
 				this.ownerStandingOn = false;
 			}
 		}
@@ -792,7 +797,7 @@ var Bomb = makeClass(new (function(){
 			(this.state == this.STATE_IDLE || this.state == this.STATE_LIVE))
 		{
 			//console.log("Bomb.update throwDone > 0: updating throw");
-			var throwDt = parseInt(game.gameTime - (this.throwDone - this.THROW_DURATION));
+			var throwDt = game.gameTime - (this.throwDone - this.THROW_DURATION);
 			//console.log("Bomb.update throwDt = " + throwDt);
 			if (this.throwDt > this.THROW_DURATION) {
 			//console.log("Bomb.update throwDt > THROW_DURATION: clearing throwDone");
@@ -800,15 +805,15 @@ var Bomb = makeClass(new (function(){
 			} else {
 				//console.log("Bomb.update throwDt <= THROW_DURAATION: calculating position");
 
-				var throwFrac = (FIXED_PREC * throwDt) / this.THROW_DURATION;
-				//console.log("Bomb.update throwFrac: " + (throwFrac / FIXED_PREC));
+				var throwFrac = throwDt / this.THROW_DURATION;
+				//console.log("Bomb.update throwFrac: " + throwFrac);
 				
 				//console.log("Bomb.update moving from " + this.srcPosX + ", " + this.srcPosY +  " to " + this.destPosX + ", " + this.destPosY);
-				var oneMinusThrowFrac = FIXED_PREC - throwFrac;
-				this.posX = (this.destPosX * throwFrac + this.srcPosX * oneMinusThrowFrac) / FIXED_PREC;
-				this.posY = (this.destPosY * throwFrac + this.srcPosY * oneMinusThrowFrac) / FIXED_PREC;
+				var oneMinusThrowFrac = 1 - throwFrac;
+				this.posX = this.destPosX * throwFrac + this.srcPosX * oneMinusThrowFrac;
+				this.posY = this.destPosY * throwFrac + this.srcPosY * oneMinusThrowFrac;
 				
-				this.posY -= 2 * throwFrac * oneMinusThrowFrac * this.THROW_HEIGHT / FIXED_PREC;
+				this.posY -= 2 * throwFrac * oneMinusThrowFrac * this.THROW_HEIGHT;
 				
 				//if we're being thrown then return before checking for explosions
 				return;
@@ -820,19 +825,19 @@ var Bomb = makeClass(new (function(){
 		if (this.state == this.STATE_IDLE || this.state == this.STATE_LIVE) {
 			//TODO - will this get skipped if it gets pushed immediately after it stopped moving across the last tile?
 			if (!this.moveFracMoving) {	//not moving at the moment
-				var typeUL = game.getMapTypeIndex((this.destPosX - FIXED_PREC / 4) / FIXED_PREC, (this.destPosY - FIXED_PREC / 4) / FIXED_PREC);
-				var typeUR = game.getMapTypeIndex((this.destPosX + FIXED_PREC / 4) / FIXED_PREC, (this.destPosY - FIXED_PREC / 4) / FIXED_PREC);
-				var typeLL = game.getMapTypeIndex((this.destPosX - FIXED_PREC / 4) / FIXED_PREC, (this.destPosY + FIXED_PREC / 4) / FIXED_PREC);
-				var typeLR = game.getMapTypeIndex((this.destPosX + FIXED_PREC / 4) / FIXED_PREC, (this.destPosY + FIXED_PREC / 4) / FIXED_PREC);
+				var typeUL = game.getMapTypeIndex((this.destPosX - .25), (this.destPosY - .25));
+				var typeUR = game.getMapTypeIndex((this.destPosX + .25), (this.destPosY - .25));
+				var typeLL = game.getMapTypeIndex((this.destPosX - .25), (this.destPosY + .25));
+				var typeLR = game.getMapTypeIndex((this.destPosX + .25), (this.destPosY + .25));
 
 				var thiz = this;
 				$.each(game.objs, function(_o,o) {
 					if (o.removeMe) return true;//continue;
 					if (o.isa(Bomb) && o.state == o.STATE_SINKING) {
-						if (typeUL == game.MAPTYPE_WATER && thiz.linfDist(o.destPosX, o.destPosY, thiz.destPosX - FIXED_PREC / 4, thiz.destPosY - FIXED_PREC / 4) < FIXED_PREC / 2) typeUL = game.MAPTYPE_EMPTY;
-						if (typeUR == game.MAPTYPE_WATER && thiz.linfDist(o.destPosX, o.destPosY, thiz.destPosX + FIXED_PREC / 4, thiz.destPosY - FIXED_PREC / 4) < FIXED_PREC / 2) typeUR = game.MAPTYPE_EMPTY;
-						if (typeLL == game.MAPTYPE_WATER && thiz.linfDist(o.destPosX, o.destPosY, thiz.destPosX - FIXED_PREC / 4, thiz.destPosY + FIXED_PREC / 4) < FIXED_PREC / 2) typeLL = game.MAPTYPE_EMPTY;
-						if (typeLR == game.MAPTYPE_WATER && thiz.linfDist(o.destPosX, o.destPosY, thiz.destPosX + FIXED_PREC / 4, thiz.destPosY + FIXED_PREC / 4) < FIXED_PREC / 2) typeLR = game.MAPTYPE_EMPTY;
+						if (typeUL == game.MAPTYPE_WATER && thiz.linfDist(o.destPosX, o.destPosY, thiz.destPosX - .25, thiz.destPosY - .25) < .5) typeUL = game.MAPTYPE_EMPTY;
+						if (typeUR == game.MAPTYPE_WATER && thiz.linfDist(o.destPosX, o.destPosY, thiz.destPosX + .25, thiz.destPosY - .25) < .5) typeUR = game.MAPTYPE_EMPTY;
+						if (typeLL == game.MAPTYPE_WATER && thiz.linfDist(o.destPosX, o.destPosY, thiz.destPosX - .25, thiz.destPosY + .25) < .5) typeLL = game.MAPTYPE_EMPTY;
+						if (typeLR == game.MAPTYPE_WATER && thiz.linfDist(o.destPosX, o.destPosY, thiz.destPosX + .25, thiz.destPosY + .25) < .5) typeLR = game.MAPTYPE_EMPTY;
 					}
 				});
 				
@@ -852,17 +857,17 @@ var Bomb = makeClass(new (function(){
 		
 		//if state is idle...
 		if (this.state == this.STATE_LIVE) {
-			var t = parseInt(game.gameTime - this.boomTimeMS);
+			var t = game.gameTime - this.boomTimeMS;
 			if (t >= 0) {
 				this.explode();
 			}
 		} else if (this.state == this.STATE_EXPLODING) {
-			var t = parseInt(game.gameTime - this.explodingDone);
+			var t = game.gameTime - this.explodingDone;
 			if (t >= 0) {
 				game.removeObj(this);
 			}
 		} else if (this.state == this.STATE_SINKING) {
-			var t = parseInt(game.gameTime - this.sinkDone);
+			var t = game.gameTime - this.sinkDone;
 			if (t >= 0) {
 
 				//remove first so it doesn't influence the checks for sunk bombs
@@ -873,23 +878,23 @@ var Bomb = makeClass(new (function(){
 				var thiz = this;
 				$.each(game.objs, function(_o,o) {
 					if (o.removeMe) return true;//continue;
-					//if this object is 1/4 tile on the sunk bomb...
-					if (thiz.linfDist(o.destPosX, o.destPosY, thiz.destPosX, thiz.destPosY) < FIXED_PREC * 3 / 4) {
+					//if this object is .25 tile on the sunk bomb...
+					if (thiz.linfDist(o.destPosX, o.destPosY, thiz.destPosX, thiz.destPosY) < .75) {
 //						Log.w(this.getClass().getName(), "Bomb.update checking for a sink against " + o.getClass().getName());
 						
 						//now check all the types under this object
-						var typeUL = game.getMapTypeIndex((o.destPosX - FIXED_PREC / 4) / FIXED_PREC, (o.destPosY - FIXED_PREC / 4) / FIXED_PREC);
-						var typeUR = game.getMapTypeIndex((o.destPosX + FIXED_PREC / 4) / FIXED_PREC, (o.destPosY - FIXED_PREC / 4) / FIXED_PREC);
-						var typeLL = game.getMapTypeIndex((o.destPosX - FIXED_PREC / 4) / FIXED_PREC, (o.destPosY + FIXED_PREC / 4) / FIXED_PREC);
-						var typeLR = game.getMapTypeIndex((o.destPosX + FIXED_PREC / 4) / FIXED_PREC, (o.destPosY + FIXED_PREC / 4) / FIXED_PREC);
+						var typeUL = game.getMapTypeIndex((o.destPosX - .25), (o.destPosY - .25));
+						var typeUR = game.getMapTypeIndex((o.destPosX + .25), (o.destPosY - .25));
+						var typeLL = game.getMapTypeIndex((o.destPosX - .25), (o.destPosY + .25));
+						var typeLR = game.getMapTypeIndex((o.destPosX + .25), (o.destPosY + .25));
 					
 						$.each(game.objs, function(_o2,o2) {
 							if (o2.removeMe) return true;//continue;
 							if (o2.isa(Bomb) && o2.state == o2.STATE_SINKING) {
-								if (typeUL == Game.MAPTYPE_WATER && thiz.linfDist(o2.destPosX, o2.destPosY, o.destPosX - FIXED_PREC / 4, o.destPosY - FIXED_PREC / 4) < FIXED_PREC / 2) typeUL = game.MAPTYPE_EMPTY;
-								if (typeUR == Game.MAPTYPE_WATER && thiz.linfDist(o2.destPosX, o2.destPosY, o.destPosX + FIXED_PREC / 4, o.destPosY - FIXED_PREC / 4) < FIXED_PREC / 2) typeUR = game.MAPTYPE_EMPTY;
-								if (typeLL == Game.MAPTYPE_WATER && thiz.linfDist(o2.destPosX, o2.destPosY, o.destPosX - FIXED_PREC / 4, o.destPosY + FIXED_PREC / 4) < FIXED_PREC / 2) typeLL = game.MAPTYPE_EMPTY;
-								if (typeLR == Game.MAPTYPE_WATER && thiz.linfDist(o2.destPosX, o2.destPosY, o.destPosX + FIXED_PREC / 4, o.destPosY + FIXED_PREC / 4) < FIXED_PREC / 2) typeLR = game.MAPTYPE_EMPTY;
+								if (typeUL == Game.MAPTYPE_WATER && thiz.linfDist(o2.destPosX, o2.destPosY, o.destPosX - .25, o.destPosY - .25) < .5) typeUL = game.MAPTYPE_EMPTY;
+								if (typeUR == Game.MAPTYPE_WATER && thiz.linfDist(o2.destPosX, o2.destPosY, o.destPosX + .25, o.destPosY - .25) < .5) typeUR = game.MAPTYPE_EMPTY;
+								if (typeLL == Game.MAPTYPE_WATER && thiz.linfDist(o2.destPosX, o2.destPosY, o.destPosX - .25, o.destPosY + .25) < .5) typeLL = game.MAPTYPE_EMPTY;
+								if (typeLR == Game.MAPTYPE_WATER && thiz.linfDist(o2.destPosX, o2.destPosY, o.destPosX + .25, o.destPosY + .25) < .5) typeLR = game.MAPTYPE_EMPTY;
 							}
 						});
 
@@ -928,10 +933,10 @@ var Bomb = makeClass(new (function(){
 		//or maybe not?
 		
 		var cantHitWorld = false;
-		var fpartx = this.destPosX & (FIXED_PREC - 1);
-		var fparty = this.destPosY & (FIXED_PREC - 1);
-		if (fpartx < FIXED_PREC / 4 || fpartx > 3 * FIXED_PREC / 4 ||
-			fparty < FIXED_PREC / 4 || fparty > 3 * FIXED_PREC / 4)
+		var fpartx = this.destPosX - Math.floor(this.destPosX);
+		var fparty = this.destPosY - Math.floor(this.destPosY);
+		if (fpartx < .25 || fpartx > .75 ||
+			fparty < .25 || fparty > .75)
 		{
 			cantHitWorld = true;
 		}
@@ -953,9 +958,9 @@ var Bomb = makeClass(new (function(){
 					//...except for the player
 					//TODO - class-based var?
 					if (o.isa(Player)) {
-						if (dist > 3 * FIXED_PREC / 4) return true;//continue;
+						if (dist > .75) return true;//continue;
 					} else {
-						if (dist > FIXED_PREC / 4) return true;//continue;
+						if (dist > .25) return true;//continue;
 					}
 					
 					o.onTouchFlames();
@@ -972,14 +977,14 @@ var Bomb = makeClass(new (function(){
 					break;
 				}
 
-				checkPosX += Dir.vec[side][0] * FIXED_PREC;
-				checkPosY += Dir.vec[side][1] * FIXED_PREC;
+				checkPosX += Dir.vec[side][0];
+				checkPosY += Dir.vec[side][1];
 				
 				var wallStopped = false;
 				for (var ofx = 0; ofx < 2; ofx++) {
 					for (var ofy = 0; ofy < 2; ofy++) {
-						var cfx = parseInt((checkPosX + ofx * FIXED_PREC / 2 - FIXED_PREC / 4) / FIXED_PREC);
-						var cfy = parseInt((checkPosY + ofy * FIXED_PREC / 2 - FIXED_PREC / 4) / FIXED_PREC);
+						var cfx = checkPosX + ofx * .5 - .25;
+						var cfy = checkPosY + ofy * .5 - .25;
 						var mapType = game.getMapType(cfx, cfy);
 						if ((mapType.flags & mapType.BLOCKS_EXPLOSIONS) != 0) {
 							//if it's half a block off then it can still be stopped
@@ -1003,9 +1008,17 @@ var Bomb = makeClass(new (function(){
 	};
 	
 	this.makeSpark = function(x, y) {
-		var spark = new Spark();
-		spark.setPos(x,y);
-		game.addObj(spark);	//concurrent modification error?
+		for (var i = 0; i < 10; ++i) {
+			var c = Math.random();
+			var particle = new Particle({
+				vel : new vec2(Math.random()*2-1, Math.random()*2-1),
+				pos : new vec2(x,y),
+				life : Math.random() * .5 + .5,
+				color : [1,c,c*Math.random()*Math.random(),1],
+				radius : .5 * Math.random() + .25
+			});
+			game.addObj(particle);
+		}
 	};
 })());
 
@@ -1025,8 +1038,6 @@ var GunShot = makeClass(new (function(){
 	};
 	
 	this.hitObject = function(what, pushDestX, pushDestY, side) {
-		pushDestX = parseInt(pushDestX);
-		pushDestY = parseInt(pushDestY);
 //		Log.w(this.getClass().getName(), "hit object of " + what.getClass().getName());
 		if (what == this.owner) return this.HIT_RESPONSE_MOVE_THRU;
 		if (what.isa(Player)) {
@@ -1042,8 +1053,8 @@ var GunShot = makeClass(new (function(){
 var Gun = makeClass(new (function(){
 	this.super = BaseObj;
 
-	this.MAD_DIST = 3 * FIXED_PREC / 4;
-	this.FIRE_DIST = FIXED_PREC / 4;
+	this.MAD_DIST = .75;
+	this.FIRE_DIST = .25;
 
 	this.init = function() {
 		Gun.super.call(this);
@@ -1120,7 +1131,7 @@ var Sentry = makeClass(new (function(){
 	this.update = function(dt) {
 		//if the player moved onto us ...
 		//TODO - put this inside 'endPush' instead! no need to call it each frame
-		if (this.linfDist(this.destPosX, this.destPosY, game.player.destPosX, game.player.destPosY) < 3 * FIXED_PREC / 4) {
+		if (this.linfDist(this.destPosX, this.destPosY, game.player.destPosX, game.player.destPosY) < .75) {
 			game.player.die();
 		}
 	
@@ -1237,7 +1248,7 @@ var Player = makeClass(new (function(){
 			if (o.isa(Bomb)) {
 				var otherBomb = o;
 				if (otherBomb.owner == thiz &&
-					thiz.linfDist(thiz.destPosX, thiz.destPosY, otherBomb.destPosX, otherBomb.destPosY) < FIXED_PREC / 4 &&
+					thiz.linfDist(thiz.destPosX, thiz.destPosY, otherBomb.destPosX, otherBomb.destPosY) < .25 &&
 					(otherBomb.state == otherBomb.STATE_IDLE || otherBomb.state == otherBomb.STATE_LIVE))
 				{
 					//by here otherBomb is a blocking bomb that we own that we're standing on
@@ -1369,7 +1380,7 @@ var Money = makeClass(new (function(){
 
 	this.endPush = function(who, pushDestX, pushDestY) {
 		if (!who.isa(Player)) return;
-		if (this.linfDist(pushDestX, pushDestY, this.destPosX, this.destPosY) >= FIXED_PREC / 2) return;	//too far away
+		if (this.linfDist(pushDestX, pushDestY, this.destPosX, this.destPosY) >= .5) return;	//too far away
 
 		{
 			var player = who;
@@ -1421,7 +1432,7 @@ var Key = makeClass(new (function(){
 		if (!who.isa(Player)) return;
 		if (this.inactive) return;
 		if (this.changeLevelTime > 0) return;	//already been touched / already waiting to change level
-		if (this.linfDist(pushDestX, pushDestY, this.destPosX, this.destPosY) >= FIXED_PREC / 2) return;	//too far away
+		if (this.linfDist(pushDestX, pushDestY, this.destPosX, this.destPosY) >= .5) return;	//too far away
 
 		//let a frame run before changing the level
 		this.changeLevelTime = game.gameTime + this.TOUCH_TO_END_LEVEL_DURATION;
@@ -1488,7 +1499,7 @@ var Game = makeClass({
 	sysTime : 0,
 	lastSysTime : 0,
 	accruedTime : 0,
-	UPDATE_DURATION : 33,	//30fps
+	UPDATE_DURATION : 1000/100,
 	gameTime : 0,
 
 	loadLevelRequest : false,
@@ -1545,7 +1556,6 @@ var Game = makeClass({
 	//static
 	gamepadToggle : function() {
 		if ($('#gamepad-checkbox').is(':checked')) {
-console.log('here');
 			showButtons();
 		} else {
 			hideButtons();
@@ -1645,8 +1655,8 @@ this.levelData = levelData;
 				var tileIndex = 0;
 				for (var y = 0 ; y < this.MAP_HEIGHT; y++) {
 					for (var x = 0; x < this.MAP_WIDTH; x++, tileIndex++) {
-						var posX = x * FIXED_PREC + FIXED_PREC / 2;
-						var posY = y * FIXED_PREC + FIXED_PREC / 2;
+						var posX = x + .5;
+						var posY = y + .5;
 						var ch = levelData.charAt(2*tileIndex);
 						var ch2 = levelData.charAt(2*tileIndex+1);
 						this.tiles[x][y] = this.mapTypes[this.MAPTYPE_EMPTY];
@@ -1704,7 +1714,7 @@ this.levelData = levelData;
 				console.log("reading tiles...");
 				for (var y = 0; y < this.MAP_HEIGHT; y++) {
 					for (var x = 0; x < this.MAP_WIDTH; x++, tileIndex++) {
-						var tileTypeIndex = parseInt(tileObj.tileIndex);
+						var tileTypeIndex = (tileObj.tileIndex);
 						if (tileTypeIndex < 0 || tileTypeIndex >= this.mapTypes.length) {
 							throw ("got a bad tile type: " + tileTypeIndex);
 						}
@@ -1718,8 +1728,8 @@ this.levelData = levelData;
 				for (var i = 0; i < ents.length(); i++) {
 					var ent = ents[i];
 					var classname = ent["class"];
-					var posX = parseInt(parseFloat(ent.x) * FIXED_PREC);
-					var posY = parseInt(parseFloat(ent.y) * FIXED_PREC);
+					var posX = parseFloat(ent.x);
+					var posY = parseFloat(ent.y);
 					
 					console.log("reading an ent " + classname + " at " + posX + " " + posY);
 					
@@ -1730,7 +1740,7 @@ this.levelData = levelData;
 					} else if (classname == "Money") {
 						var money = new Money();
 						money.setPos(posX,posY);
-						if (ent.bombs !== undefined) money.bombs = parseInt(ent.bombs);
+						if (ent.bombs !== undefined) money.bombs = (ent.bombs);
 						this.objs.push(money);
 					} else if (classname == "Key") {
 						var key = new Key();
@@ -1739,8 +1749,8 @@ this.levelData = levelData;
 					} else if (classname == "Bomb") {
 						var bomb = new Bomb();
 						bomb.setPos(posX,posY);
-						if (ent.time !== undefined) bomb.setFuse(parseInt(ent.time));
-						if (ent.radius !== undefined) bomb.blastRadius = parseInt(ent.radius);
+						if (ent.time !== undefined) bomb.setFuse((ent.time));
+						if (ent.radius !== undefined) bomb.blastRadius = (ent.radius);
 						this.objs.push(bomb);
 					} else if (classname == "Framer") {
 						var framer = new Framer();
@@ -1840,7 +1850,6 @@ this.levelData = levelData;
 	},
 
 	setFontSize : function(fontSize) {
-		fontSize = parseInt(fontSize);
 		if (fontSize === this.fontSize) return;
 		this.fontSize = fontSize;
 		$('#game-stats').css({fontSize:fontSize});
@@ -1919,6 +1928,8 @@ this.levelData = levelData;
 	},
 
 	getMapType : function(ix, iy) {
+		ix = parseInt(ix);
+		iy = parseInt(iy);
 		if (ix < 0 || iy < 0 || ix >= this.MAP_WIDTH || iy >= this.MAP_HEIGHT) return this.mapTypes[this.MAPTYPE_OOB];
 		return this.tiles[ix][iy];
 	},
@@ -2251,6 +2262,7 @@ function update() {
 		game.update();
 		game.draw();
 	}
+	
 	requestAnimFrame(update);
 }
 
@@ -2622,5 +2634,3 @@ function resizeButtons() {
 		buttons[i].refresh();
 	}
 }
-
-
