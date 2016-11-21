@@ -286,10 +286,10 @@ var BaseObj = makeClass(new (function(){
 
 	//helpful for subclasses.  TODO - move somewhere else
 	this.linfDist = function(ax, ay, bx, by) {
-		ax = parseInt(ax + .5);
-		ay = parseInt(ay + .5);
-		bx = parseInt(bx + .5);
-		by = parseInt(by + .5);
+		ax = .5 * parseInt(ax * 2);
+		ay = .5 * parseInt(ay * 2);
+		bx = .5 * parseInt(bx * 2);
+		by = .5 * parseInt(by * 2);
 		var dx = ax - bx;
 		var dy = ay - by;
 		var adx = dx < 0 ? -dx : dx;
