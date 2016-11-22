@@ -267,6 +267,8 @@ var AnimatedObj = makeClass(new (function(){
 	};
 })());
 
+var cachedAlphaThresholdResolution = 255;
+var cachedAlphaThresholdImages = {};
 var BaseObj = makeClass(new (function(){
 	this.super = AnimatedObj;
 
@@ -330,20 +332,28 @@ var BaseObj = makeClass(new (function(){
 		if (!bitmap) throw 'failed to find bitmap for frame '+this.frameId;
 		
 		if (this.blend == 'alpha-threshold') {	
-			var tmpcanvas = document.createElement('canvas');
-			tmpcanvas.width = bitmap.width;
-			tmpcanvas.height = bitmap.height;
-			
-			var tmpctx = tmpcanvas.getContext('2d');
-			tmpctx.drawImage(bitmap, 0, 0);
-			var imagedata = tmpctx.getImageData(0, 0, bitmap.width, bitmap.height);
-			var data = imagedata.data;
 			var alpha = this.color !== undefined ? this.color[3] : 1;
-			for (var i = 0; i < data.length; i += 4) {
-				data[i+3] = data[i+3] * alpha < 128 ? 0 : 63;
+		
+			if (!cachedAlphaThresholdImages[bitmap.src]) {
+				cachedAlphaThresholdImages[bitmap.src] = [];
 			}
-			tmpctx.putImageData(imagedata, 0, 0);
-			
+			var tmpcanvas = cachedAlphaThresholdImages[bitmap.src][Math.floor(alpha * cachedAlphaThresholdResolution)];
+			if (!tmpcanvas) {
+				tmpcanvas = document.createElement('canvas');
+				cachedAlphaThresholdImages[bitmap.src][Math.floor(alpha * cachedAlphaThresholdResolution)] = tmpcanvas;
+				tmpcanvas.width = bitmap.width;
+				tmpcanvas.height = bitmap.height;
+				
+				var tmpctx = tmpcanvas.getContext('2d');
+				tmpctx.drawImage(bitmap, 0, 0);
+				var imagedata = tmpctx.getImageData(0, 0, bitmap.width, bitmap.height);
+				var data = imagedata.data;
+				for (var i = 0; i < data.length; i += 4) {
+					data[i+3] = data[i+3] * alpha < 128 ? 0 : 63;
+				}
+				tmpctx.putImageData(imagedata, 0, 0);
+			}
+
 			c.fillStyle = '#fff';
 			c.globalAlpha = 1;
 			c.globalCompositeOperation = 'source-over';
