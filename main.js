@@ -1074,16 +1074,17 @@ var Bomb = makeClass(new (function(){
 								(mapType.flags & mapType.BOMBABLE) != 0)	//only turn bricks into empty
 							{
 								//make some particles
-								var divs = 3;
+								var divs = 1;
 								for (var u = 0; u < divs; ++u) {
 									for (var v = 0; v < divs; ++v) {
-										var speed = 3;
+										var speed = 0;
 										game.addObj(new Particle({
 											vel : [speed*(Math.random()*2-1), speed*(Math.random()*2-1)],
 											pos : [cfx + (u+.5)/divs, cfy + (v+.5)/divs],
 											life : Math.random() * .5 + .5,
-											radius : .25,// * (Math.random() + .5),
-											seq : Animation.prototype.SEQ_BRICKS
+											radius : .5,// * (Math.random() + .5),
+											seq : Animation.prototype.SEQ_BRICKS,
+											blend : 'lighter'
 										}));
 									}
 								}
