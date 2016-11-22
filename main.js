@@ -72,7 +72,7 @@ var Animation = makeClass({
 	SEQ_DOOR : 11,
 	SEQ_SPARK : 13,
 	SEQ_FRAMER : 14,
-	
+		
 	SEQ_BOMB : 12,
 	SEQ_BOMB_LIT : 18,
 	SEQ_BOMB_SUNK : 19,
@@ -86,7 +86,9 @@ var Animation = makeClass({
 	
 	SEQ_CLOUD: 22,
 	
-	SEQ_COUNT : 23, 	
+	SEQ_BRICKS : 23,
+	
+	SEQ_COUNT : 24, 	
 
 	init : function() {
 		for (var i = 0; i < this.framesForSeq.length; i++) {
@@ -175,8 +177,9 @@ Animation.prototype.frames = [
 	//glove
 	new Frame('gloves', 1, 0, Animation.prototype.SEQ_GLOVE),
 	
-	//glove
-	new Frame('cloud', 1, 0, Animation.prototype.SEQ_CLOUD)
+	new Frame('cloud', 1, 0, Animation.prototype.SEQ_CLOUD),
+	
+	new Frame('bricks', 1, 0, Animation.prototype.SEQ_BRICKS)
 ];
 
 var GameNumbers = makeClass(new (function(){
@@ -667,18 +670,19 @@ var Particle = makeClass(new (function(){
 	this.isBlocking = false;
 	this.isBlockingPushers = false;
 	this.blocksExplosion = false;
-	this.blend = 'lighter';
+	this.seq = Animation.prototype.SEQ_SPARK;
 
 	this.init = function(args) {
 		Particle.super.call(this);
 		this.vel = args.vel;
 		this.life = args.life;	//in seconds
-		this.srccolor = args.color.clone();
-		this.color = args.color.clone();
+		this.color = args.color !== undefined ? args.color.clone() : [1,1,1,1];
+		this.srccolor = this.color.clone();
 		this.scale = [args.radius * 2, args.radius * 2];
 		this.setPos(args.pos[0], args.pos[1]);
 		this.startTime = game.time;
-		this.setSeq(Animation.prototype.SEQ_SPARK);
+		if (args.blend !== undefined) this.blend = args.blend;
+		this.setSeq(args.seq !== undefined ? args.seq : this.seq);
 	};
 	
 	this.update = function(dt) {
@@ -1059,8 +1063,8 @@ var Bomb = makeClass(new (function(){
 				var wallStopped = false;
 				for (var ofx = 0; ofx < 2; ofx++) {
 					for (var ofy = 0; ofy < 2; ofy++) {
-						var cfx = checkPosX + ofx * .5 - .25;
-						var cfy = checkPosY + ofy * .5 - .25;
+						var cfx = Math.floor(checkPosX + ofx * .5 - .25);
+						var cfy = Math.floor(checkPosY + ofy * .5 - .25);
 						var mapType = game.getMapType(cfx, cfy);
 						if ((mapType.flags & mapType.BLOCKS_EXPLOSIONS) != 0) {
 							//if it's half a block off then it can still be stopped
@@ -1069,6 +1073,21 @@ var Bomb = makeClass(new (function(){
 							if (!cantHitWorld &&
 								(mapType.flags & mapType.BOMBABLE) != 0)	//only turn bricks into empty
 							{
+								//make some particles
+								var divs = 3;
+								for (var u = 0; u < divs; ++u) {
+									for (var v = 0; v < divs; ++v) {
+										var speed = 3;
+										game.addObj(new Particle({
+											vel : [speed*(Math.random()*2-1), speed*(Math.random()*2-1)],
+											pos : [cfx + (u+.5)/divs, cfy + (v+.5)/divs],
+											life : Math.random() * .5 + .5,
+											radius : .25,// * (Math.random() + .5),
+											seq : Animation.prototype.SEQ_BRICKS
+										}));
+									}
+								}
+								
 								game.setMapTypeIndex(cfx, cfy, game.MAPTYPE_EMPTY);
 							}
 							wallStopped = true;
@@ -1092,7 +1111,8 @@ var Bomb = makeClass(new (function(){
 				pos : [x,y],
 				life : .5 * (Math.random() * .5 + .5),
 				color : [1,c,c*Math.random()*Math.random(),1],
-				radius : .25 * (Math.random() + .5)
+				radius : .25 * (Math.random() + .5),
+				blend : 'lighter'
 			}));
 		}
 	};
