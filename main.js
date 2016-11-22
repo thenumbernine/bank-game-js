@@ -238,14 +238,16 @@ var AnimatedObj = makeClass(new (function(){
 
 	this.frameId = 0;	//index into frametable
 	this.frameTime = 0;	//measured in fps intervals, i.e. frames
-	
+
+	this.framerate = 30;	//animation framerate
+
 	this.seq = -1;
 	
-	this.update = function(deltaTimeMS) {
+	this.update = function(dt) {
 		if (this.frameId < 0 || this.frameId >= anim.frames.length) return;
 		var frame = anim.frames[this.frameId];
-		this.frameTime += deltaTimeMS;
-		if (this.frameTime < frame.duration * 1000/33) return;
+		this.frameTime += dt * this.framerate;
+		if (this.frameTime < frame.duration) return;
 		this.setFrame(this.frameId + frame.frameChange);
 	};
 	
@@ -377,18 +379,15 @@ var BaseObj = makeClass(new (function(){
 	
 	this.cannotPassThru = function(maptype) {
 		var res = (game.mapTypes[maptype].flags & MapType.prototype.CANNOT_PASSTHRU) != 0;
-//		Log.w(this.getClass().getName(), "BaseObj.cannotPassThru " + res);
 		return res;
 	};
 	
 	this.hitWorld = function(whereX, whereY, typeUL, typeUR, typeLL, typeLR) {
-//		Log.w(this.getClass().getName(), "BaseObj.hitWorld types " + typeUL + " " + typeUR + " " + typeLL + " " + typeLR);
 		var res =
 			this.cannotPassThru(typeUL) ||
 			this.cannotPassThru(typeUR) ||
 			this.cannotPassThru(typeLL) ||
 			this.cannotPassThru(typeLR);
-//		Log.w(this.getClass().getName(), "BaseObj.hitWorld " + res);
 		return res;
 	};
 	
@@ -441,7 +440,6 @@ var MovableObj = makeClass(new (function(){
 		var typeUR = game.getMapTypeIndex(whereX + .25, whereY - .25);
 		var typeLL = game.getMapTypeIndex(whereX - .25, whereY + .25);
 		var typeLR = game.getMapTypeIndex(whereX + .25, whereY + .25);
-		//Log.w(this.getClass().getName(), "MovableObj.moveIsBlocked_CheckHitWorld types " + typeUL + " " + typeUR + " " + typeLL + " " + typeLR);
 		
 		return this.hitWorld(whereX, whereY, typeUL, typeUR, typeLL, typeLR);
 	};
@@ -517,7 +515,6 @@ var MovableObj = makeClass(new (function(){
 	
 	this.doMove = function(cmd) {
 		if (cmd == Dir.NONE) return this.MOVE_RESPONSE_NO_MOVE;
-		//Log.w(this.getClass().getName(), "MovableObj.doMove("+cmd+")");
 
 		var newDestX = this.posX;
 		var newDestY = this.posY;
@@ -528,10 +525,8 @@ var MovableObj = makeClass(new (function(){
 			return this.MOVE_RESPONSE_NO_MOVE;
 		}
 		
-		//Log.w(this.getClass().getName(), "MovableObj.doMove newDest " + newDestX + " " + newDestY);
 		if (this.moveIsBlocked(cmd, newDestX, newDestY)) {
 			moveFracMoving = false;
-			//Log.w(this.getClass().getName(), "MovableObj.doMove MOVE_RESPONSE_WAS_BLOCKED");
 			return this.MOVE_RESPONSE_WAS_BLOCKED;
 		}
 		
@@ -544,23 +539,14 @@ var MovableObj = makeClass(new (function(){
 		this.srcPosX = this.posX;
 		this.srcPosY = this.posY;
 
-//		Log.w(this.getClass().getName(), "MovableObj.doMove moveFrac " + moveFrac);
-//		Log.w(this.getClass().getName(), "MovableObj.doMove moveFracMoving " + moveFracMoving);
-//		Log.w(this.getClass().getName(), "MovableObj.doMove srcPos " + srcPosX + " " + srcPosY);
-//		Log.w(this.getClass().getName(), "MovableObj.doMove destPos " + destPosX + " " + destPosY);
-//		Log.w(this.getClass().getName(), "MovableObj.doMove MOVE_RESPONSE_DID_MOVE");
 		return this.MOVE_RESPONSE_DID_MOVE;
 	};
 	
-	this.update = function(deltaTimeMS) {
-//		Log.w(this.getClass().getName(), "MovableObj.update("+deltaTimeMS+")");
-		MovableObj.superProto.update.call(this, deltaTimeMS);
-//		Log.w(this.getClass().getName(), "MovableObj.update testing moveFracMoving ... " + moveFracMoving);
+	this.update = function(dt) {
+		MovableObj.superProto.update.call(this, dt);
 		if (this.moveFracMoving) {
-			this.moveFrac += deltaTimeMS/1000 * this.speed;
-//			Log.w(this.getClass().getName(), "MovableObj.update moveFrac = " + moveFrac);
+			this.moveFrac += dt * this.speed;
 			if (this.moveFrac >= 1) {
-//				Log.w(this.getClass().getName(), "MovableObj.update setting moveFracMoving = " + moveFracMoving);
 				this.moveFracMoving = false;
 				this.posX = this.destPosX;
 				this.posY = this.destPosY;
@@ -597,11 +583,8 @@ var PushableObj = makeClass(new (function(){
 	this.startPush = function(pusher, pushDestX, pushDestY, side) {
 		var superResult = PushableObj.superProto.startPush.call(this, pusher, pushDestX, pushDestY, side);
 		
-//		Log.w(this.getClass().getName(), "PushableObj.startPush");
-		
 		//if (pusher instanceof Player)
 		{
-//			Log.w(this.getClass().getName(), "PushableObj.startPush isBlocking "+isBlocking);
 			if (!this.isBlocking) return false;
 			
 			var delta = 0;
@@ -617,11 +600,8 @@ var PushableObj = makeClass(new (function(){
 			}
 			if (delta < 0) delta = -delta;
 			var align = delta < .25;
-//			Log.w(this.getClass().getName(), "PushableObj.startPush align "+align);
-//			Log.w(this.getClass().getName(), "PushableObj.startPush moveFracMoving "+moveFracMoving);
 			
 			if (align && !this.moveFracMoving) {
-//				Log.w(this.getClass().getName(), "PushableObj.startPush doMove "+side);
 				var moveResponse = this.doMove(side);
 				switch (moveResponse) {
 				case this.MOVE_RESPONSE_WAS_BLOCKED:
@@ -661,18 +641,17 @@ var Cloud = makeClass(new (function(){
 		this.life = args.life;
 		this.scale = [args.scale, args.scale],
 		this.setPos(args.pos[0], args.pos[1]);
-		this.startTime = game.gameTimeMS/1000;
+		this.startTime = game.time;
 		this.setSeq(Animation.prototype.SEQ_CLOUD);
 		this.color = [1,1,1,1];
 	};
 
-	this.update = function(deltaTimeMS) {
-		Cloud.superProto.update.call(this, deltaTimeMS);
+	this.update = function(dt) {
+		Cloud.superProto.update.call(this, dt);
 
-		var dt = deltaTimeMS/1000;
 		this.setPos(this.posX + dt * this.vel[0], this.posY + dt * this.vel[1]);
 
-		var frac = (game.gameTimeMS/1000 - this.startTime) / this.life;
+		var frac = (game.time - this.startTime) / this.life;
 		if (frac > 1) frac = 1;
 		this.color[3] = (1-frac)*(1-frac);
 
@@ -698,17 +677,16 @@ var Particle = makeClass(new (function(){
 		this.color = args.color.clone();
 		this.scale = [args.radius * 2, args.radius * 2];
 		this.setPos(args.pos[0], args.pos[1]);
-		this.startTime = game.gameTimeMS/1000;
+		this.startTime = game.time;
 		this.setSeq(Animation.prototype.SEQ_SPARK);
 	};
 	
-	this.update = function(deltaTimeMS) {
-		Particle.superProto.update.call(this, deltaTimeMS);
+	this.update = function(dt) {
+		Particle.superProto.update.call(this, dt);
 
-		var dt = deltaTimeMS/1000;
 		this.setPos(this.posX + dt * this.vel[0], this.posY + dt * this.vel[1]);
 
-		var frac = 1 - (game.gameTimeMS/1000 - this.startTime) / this.life;
+		var frac = 1 - (game.time - this.startTime) / this.life;
 		if (frac < 0) frac = 0;
 		this.color[3] = this.srccolor[3] * frac;
 
@@ -721,7 +699,7 @@ var Particle = makeClass(new (function(){
 
 var Bomb = makeClass(new (function(){
 	this.super = PushableObj;
-	this.boomTimeMS = 0;
+	this.boomTime = 0;
 	this.blastRadius = 1;
 	this.explodingDone = 0;
 	this.sinkDone = 0;
@@ -805,7 +783,7 @@ var Bomb = makeClass(new (function(){
 		this.destPosY = this.srcPosY + Dir.vec[dir][1] * this.THROW_DIST;
 		
 		this.holder = undefined;	//doesn't matter anymore
-		this.throwDone = game.gameTimeMS/1000 + this.throwDuration;
+		this.throwDone = game.time + this.throwDuration;
 	};
 	
 	this.setFuse = function(fuseTime) {
@@ -816,7 +794,7 @@ var Bomb = makeClass(new (function(){
 		}
 		this.setSeq(Animation.prototype.SEQ_BOMB_LIT);
 		this.state = this.STATE_LIVE;
-		this.boomTime = game.gameTimeMS/1000 + fuseTime;
+		this.boomTime = game.time + fuseTime;
 	};
 	
 	//bombs can only pass thru empty and water
@@ -862,8 +840,8 @@ var Bomb = makeClass(new (function(){
 		this.isBlockingPushers = false;
 	};
 	
-	this.update = function(deltaTimeMS) {
-		Bomb.superProto.update.call(this, deltaTimeMS);
+	this.update = function(dt) {
+		Bomb.superProto.update.call(this, dt);
 
 		if (this.holder !== undefined) {
 			//well we can clear the ownerStandingOn flag ...
@@ -886,7 +864,7 @@ var Bomb = makeClass(new (function(){
 			(this.state == this.STATE_IDLE || this.state == this.STATE_LIVE))
 		{
 			//console.log("Bomb.update throwDone > 0: updating throw");
-			var throwDt = game.gameTimeMS/1000 - (this.throwDone - this.throwDuration);
+			var throwDt = game.time - (this.throwDone - this.throwDuration);
 			//console.log("Bomb.update throwDt = " + throwDt);
 			if (this.throwDt > this.throwDuration) {
 			//console.log("Bomb.update throwDt > throwDuration: clearing throwDone");
@@ -939,26 +917,26 @@ var Bomb = makeClass(new (function(){
 					this.state = this.STATE_SINKING;
 					this.isBlocking = false;
 					this.isBlockingPushers = false;
-					this.sinkDone = game.gameTimeMS/1000 + this.sinkDuration;
+					this.sinkDone = game.time + this.sinkDuration;
 				}
 			}
 		}
 		
 		//if state is idle...
 		if (this.state == this.STATE_LIVE) {
-			var t = game.gameTimeMS/1000 - this.boomTime;
+			var t = game.time - this.boomTime;
 			var s = Math.cos(2*t*Math.PI)*.2+.9;
 			this.scale = [s,s];
 			if (t >= 0) {
 				this.explode();
 			}
 		} else if (this.state == this.STATE_EXPLODING) {
-			var t = game.gameTimeMS/1000 - this.explodingDone;
+			var t = game.time - this.explodingDone;
 			if (t >= 0) {
 				game.removeObj(this);
 			}
 		} else if (this.state == this.STATE_SINKING) {
-			var t = game.gameTimeMS/1000 - this.sinkDone;
+			var t = game.time - this.sinkDone;
 			if (t >= 0) {
 
 				//remove first so it doesn't influence the checks for sunk bombs
@@ -971,7 +949,6 @@ var Bomb = makeClass(new (function(){
 					if (o.removeMe) return true;//continue;
 					//if this object is .25 tile on the sunk bomb...
 					if (thiz.linfDist(o.destPosX, o.destPosY, thiz.destPosX, thiz.destPosY) < .75) {
-//						Log.w(this.getClass().getName(), "Bomb.update checking for a sink against " + o.getClass().getName());
 						
 						//now check all the types under this object
 						var typeUL = game.getMapTypeIndex(o.destPosX - .25, o.destPosY - .25);
@@ -989,8 +966,6 @@ var Bomb = makeClass(new (function(){
 							}
 						});
 
-//						Log.w(this.getClass().getName(), "types " + typeUL + ", " + typeUR + ", " + typeLL + ", " + typeLR);
-						
 						if (typeUL == game.MAPTYPE_WATER &&
 							typeUR == game.MAPTYPE_WATER &&
 							typeLL == game.MAPTYPE_WATER &&
@@ -1105,7 +1080,7 @@ var Bomb = makeClass(new (function(){
 		}
 		
 		this.state = this.STATE_EXPLODING;
-		this.explodingDone = game.gameTimeMS/1000 + this.explodingDuration;
+		this.explodingDone = game.time + this.explodingDuration;
 	};
 	
 	this.makeSpark = function(x, y) {
@@ -1139,10 +1114,8 @@ var GunShot = makeClass(new (function(){
 	};
 	
 	this.hitObject = function(what, pushDestX, pushDestY, side) {
-//		Log.w(this.getClass().getName(), "hit object of " + what.getClass().getName());
 		if (what == this.owner) return this.HIT_RESPONSE_MOVE_THRU;
 		if (what.isa(Player)) {
-//			Log.w(this.getClass().getName(), "hit player!");
 			what.die();
 			return this.HIT_RESPONSE_STOP;
 		}
@@ -1167,11 +1140,9 @@ var Gun = makeClass(new (function(){
 		
 		this.setSeq(Animation.prototype.SEQ_GUN);
 		
-//		Log.w(this.getClass().getName(), "testing player");
 		if (game.player !== undefined &&
 			!game.player.dead)
 		{
-//			Log.w(this.getClass().getName(), "found a player not dead yet");
 			var diffX = game.player.posX - this.posX;
 			var diffY = game.player.posY - this.posY;
 			var absDiffX = diffX < 0 ? -diffX : diffX;
@@ -1179,12 +1150,10 @@ var Gun = makeClass(new (function(){
 			var dist = absDiffX < absDiffY ? absDiffX : absDiffY;
 			
 			if (dist < this.MAD_DIST) {
-//				Log.w(this.getClass().getName(), "getting mad");
 				this.setSeq(Animation.prototype.SEQ_GUN_MAD);
 			}
 			
 			if (dist < this.FIRE_DIST) {
-//				Log.w(this.getClass().getName(), "shooting...");
 				var dir = Dir.NONE;
 				if (diffX < diffY) {	//left or down
 					if (diffX < -diffY) {
@@ -1200,13 +1169,11 @@ var Gun = makeClass(new (function(){
 					}
 				}
 				
-//				Log.w(this.getClass().getName(), "direction " + dir);
 				var shot = new GunShot(this);
 				var response = -1;
 				do {
 					response = shot.doMove(dir);
 					shot.setPos(shot.destPosX, shot.destPosY);
-//					Log.w(this.getClass().getName(), "shot at " + shot.posX + " " + shot.posY);
 				} while (response != shot.MOVE_RESPONSE_WAS_BLOCKED);
 				//delete ... but it's not attached, so we're safe
 			}
@@ -1387,14 +1354,13 @@ var Player = makeClass(new (function(){
 		this.moveCmd = Dir.NONE;	//clear for next time through
 	};
 	
-	this.update = function(deltaTimeMS) {
-//		Log.w(this.getClass().getName(), "Player.update("+deltaTimeMS+")");
+	this.update = function(dt) {
 
 		if (this.moveCmd != Dir.NONE) {
 			this.dir = this.moveCmd;
 		}
 		
-		Player.superProto.update.call(this, deltaTimeMS);
+		Player.superProto.update.call(this, dt);
 		
 		if (this.dead) {
 			//setSeq(Animation.prototype.SEQ_PLAYER_DEAD);
@@ -1418,7 +1384,7 @@ var Player = makeClass(new (function(){
 		if (this.dead) return;
 		this.setSeq(Animation.prototype.SEQ_PLAYER_DEAD);
 		this.dead = true;
-		this.deadTime = game.gameTimeMS + 2000;
+		this.deadTime = game.time + 2;
 
 		this.isBlocking = false;
 		this.isBlockingPushers = false;
@@ -1500,7 +1466,6 @@ var Money = makeClass(new (function(){
 				key = o;
 			}
 		});
-//		Log.w(this.getClass().getName(), "money left: " + moneyleft);
 		if (moneyleft == 0) {
 			//throw an exception if there's no key
 			if (key) key.show();
@@ -1513,7 +1478,7 @@ var Key = makeClass(new (function(){
 
 	this.changeLevelTime = 0;
 	//wait a frame or so between player touch and end level
-	this.TOUCH_TO_END_LEVEL_DURATION = 33;
+	this.touchToEndLevelDuration = 1/50;
 
 	this.inactive = true;
 
@@ -1536,7 +1501,7 @@ var Key = makeClass(new (function(){
 		if (this.linfDist(pushDestX, pushDestY, this.destPosX, this.destPosY) >= .5) return;	//too far away
 
 		//let a frame run before changing the level
-		this.changeLevelTime = game.gameTimeMS + this.TOUCH_TO_END_LEVEL_DURATION;
+		this.changeLevelTime = game.time + this.touchToEndLevelDuration;
 
 		this.frameId = -1;	//disappear
 		
@@ -1556,7 +1521,7 @@ var Key = makeClass(new (function(){
 	
 	this.update = function(dt) {
 		Key.superProto.update.call(this, dt);
-		if (this.changeLevelTime > 0 && this.changeLevelTime < game.gameTimeMS) {
+		if (this.changeLevelTime > 0 && this.changeLevelTime < game.time) {
 			if (!game.player.dead) {
 				game.nextLevel();
 			}
@@ -1600,8 +1565,8 @@ var Game = makeClass({
 	sysTime : 0,
 	lastSysTime : 0,
 	accruedTime : 0,
-	UPDATE_DURATION : 1000/50,
-	gameTimeMS : 0,
+	updateDuration : 1/50,
+	time : 0,
 
 	loadLevelRequest : false,
 	level : 0,
@@ -1876,7 +1841,7 @@ this.levelData = levelData;
 		this.lastSysTime = this.sysTime;
 		this.sysTime = Date.now();
 		var deltaTime = this.sysTime - this.lastSysTime;
-		this.accruedTime += deltaTime;
+		this.accruedTime += deltaTime/1000;
 		
 		if (this.player) {
 			if ((this.cmd & this.CMD_UP) != 0) {
@@ -1899,16 +1864,16 @@ this.levelData = levelData;
 			}
 		}
 
-		while (this.accruedTime > this.UPDATE_DURATION) {
-			this.accruedTime -= this.UPDATE_DURATION;
-			this.gameTimeMS += this.UPDATE_DURATION;
+		while (this.accruedTime > this.updateDuration) {
+			this.accruedTime -= this.updateDuration;
+			this.time += this.updateDuration;
 		
 			//do game update here
 
 			var thiz = this;
 			$.each(this.objs, function(_o,o) {
 				if (o.removeMe) return true;	//continue
-				o.update(thiz.UPDATE_DURATION);
+				o.update(thiz.updateDuration);
 			});
 			
 			// ... only one update at most
@@ -1916,7 +1881,7 @@ this.levelData = levelData;
 			break;
 		}
 		
-		if (this.player && this.player.dead && this.player.deadTime < this.gameTimeMS) {
+		if (this.player && this.player.dead && this.player.deadTime < this.time) {
 			this.loadLevel();	//set the request
 		}
 		
