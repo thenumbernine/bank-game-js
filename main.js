@@ -1,3 +1,5 @@
+var canvas, glutil, gl;
+
 function Rect() {
 	this.left = 0;
 	this.right = 0;
@@ -185,7 +187,7 @@ var GameNumbers = makeClass(new (function(){
 		}
 	};
 	this.draw = function(c, rect, n, x, y) {
-		var paddingX = c.canvas.width - game.MAP_WIDTH * game.TILE_WIDTH;
+		var paddingX = game.canvas.width - game.MAP_WIDTH * game.TILE_WIDTH;
 		var s = ''+n;
 		for (var i = 0; i < s.length; i++) {
 			var frame = s.charCodeAt(i) - ('0').charCodeAt(0);
@@ -217,8 +219,8 @@ function GameText() {
 }
 GameText.prototype = {
 	draw : function(c, text, posX, posY) {
-		var paddingX = c.canvas.width - game.MAP_WIDTH * game.TILE_WIDTH;
-		var canvasPos = $(c.canvas).position();
+		var paddingX = game.canvas.width - game.MAP_WIDTH * game.TILE_WIDTH;
+		var canvasPos = $(game.canvas).position();
 		this.span.get(0).style.fontSize = parseInt(game.TILE_HEIGHT/2)+'px';
 		this.span.get(0).style.left = parseInt(canvasPos.left + ((posX - .25) * game.TILE_WIDTH) + paddingX);
 		this.span.get(0).style.top = parseInt(canvasPos.top + ((posY + .25) * game.TILE_HEIGHT) - game.TILE_HEIGHT/2);
@@ -230,7 +232,7 @@ GameText.prototype = {
 
 var AnimatedObj = makeClass(new (function(){
 
-	this.scale = new vec2(1,1);
+	this.scale = [1,1];
 
 	this.frameId = 0;	//index into frametable
 	this.frameTime = 0;	//measured in fps intervals, i.e. frames
@@ -283,6 +285,7 @@ var BaseObj = makeClass(new (function(){
 	this.blocksExplosion = true;
 		
 	this.blend = 'none';
+	this.color = [1,1,1,1];
 
 	//helpful for subclasses.  TODO - move somewhere else
 	this.linfDist = function(ax, ay, bx, by) {
@@ -304,12 +307,12 @@ var BaseObj = makeClass(new (function(){
 	this.drawSprite = function(c, rect) {
 		if (this.frameId < 0 || this.frameId >= anim.frames.length) return;
 		
-		var paddingX = c.canvas.width - game.MAP_WIDTH * game.TILE_WIDTH;
+		var paddingX = game.canvas.width - game.MAP_WIDTH * game.TILE_WIDTH;
 		
-		rect.left = (this.posX - .5 * this.scale.x) * game.TILE_WIDTH + paddingX;
-		rect.right = rect.left + game.TILE_WIDTH * this.scale.x;
-		rect.top = (this.posY - .5 * this.scale.y) * game.TILE_HEIGHT;
-		rect.bottom = rect.top + game.TILE_HEIGHT * this.scale.y;
+		rect.left = (this.posX - .5 * this.scale[0]) * game.TILE_WIDTH + paddingX;
+		rect.right = rect.left + game.TILE_WIDTH * this.scale[0];
+		rect.top = (this.posY - .5 * this.scale[1]) * game.TILE_HEIGHT;
+		rect.bottom = rect.top + game.TILE_HEIGHT * this.scale[1];
 		
 		var frame = anim.frames[this.frameId];
 		if (!frame) throw 'failed to find frame for id '+this.frameId;
@@ -322,21 +325,22 @@ var BaseObj = makeClass(new (function(){
 		} else {
 			c.globalCompositeOperation = 'source-over';
 		}
-	
+
 		if (this.color !== undefined) {
-			c.fillStyle = 'rgba('
-				+parseInt(this.color.x*255)+','
-				+parseInt(this.color.y*255)+','
-				+parseInt(this.color.z*255)+','
-				+parseInt(this.color.w*255)+')';
+			c.globalAlpha = this.color[3];
+			c.fillStyle = 'rgb('
+				+parseInt(this.color[0]*255)+','
+				+parseInt(this.color[1]*255)+','
+				+parseInt(this.color[2]*255)+')';
 		}
 
-		c.drawImage(bitmap, 
-			rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top
-		);
-		
-		c.fillStyle = null;
-		
+		c.drawImage(bitmap, rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top);
+	
+		if (this.color !== undefined) {
+			c.fillStyle = '#fff';
+			c.globalAlpha = 1;
+		}
+
 		c.globalCompositeOperation = 'source-over';
 	};
 	
@@ -631,18 +635,17 @@ var Cloud = makeClass(new (function(){
 		Cloud.super.call(this);
 		this.vel = args.vel;
 		this.life = args.life;
-		this.scale = new vec2(args.scale, args.scale),
-		this.setPos(args.pos.x, args.pos.y);
+		this.scale = [args.scale, args.scale],
+		this.setPos(args.pos[0], args.pos[1]);
 		this.startTimeMS = game.gameTime;
 		this.setSeq(Animation.prototype.SEQ_CLOUD);
-		this.color = new vec4(1,1,1,1);
 	};
 
 	this.update = function(deltaTimeMS) {
 		Cloud.superProto.update.call(this, deltaTimeMS);
 
 		var dt = deltaTimeMS / 1000;
-		this.setPos(this.posX + dt * this.vel.x, this.posY + dt * this.vel.y);
+		this.setPos(this.posX + dt * this.vel[0], this.posY + dt * this.vel[1]);
 
 		var frac = (game.gameTime - this.startTimeMS)/1000 / this.life;
 		if (frac > 1) frac = 1;
@@ -666,10 +669,10 @@ var Particle = makeClass(new (function(){
 		Particle.super.call(this);
 		this.vel = args.vel;
 		this.life = args.life;	//in seconds
-		this.srccolor = new vec4(args.color);
-		this.color = new vec4(args.color);
-		this.scale = new vec2(args.radius * 2, args.radius * 2);
-		this.setPos(args.pos.x, args.pos.y);
+		this.srccolor = args.color.clone();
+		this.color = args.color.clone();
+		this.scale = [args.radius * 2, args.radius * 2];
+		this.setPos(args.pos[0], args.pos[1]);
 		this.startTimeMS = game.gameTime;
 		this.setSeq(Animation.prototype.SEQ_SPARK);
 	};
@@ -678,7 +681,7 @@ var Particle = makeClass(new (function(){
 		Particle.superProto.update.call(this, deltaTimeMS);
 
 		var dt = deltaTimeMS / 1000;
-		this.setPos(this.posX + dt * this.vel.x, this.posY + dt * this.vel.y);
+		this.setPos(this.posX + dt * this.vel[0], this.posY + dt * this.vel[1]);
 
 		var frac = 1 - (game.gameTime - this.startTimeMS)/1000 / this.life;
 		if (frac < 0) frac = 0;
@@ -919,7 +922,8 @@ var Bomb = makeClass(new (function(){
 		//if state is idle...
 		if (this.state == this.STATE_LIVE) {
 			var t = (game.gameTime - this.boomTimeMS) / 1000;
-			this.scale = new vec2(Math.cos(2*t*Math.PI)*.2+.9);
+			var s = Math.cos(2*t*Math.PI)*.2+.9;
+			this.scale = [s,s];
 			if (t >= 0) {
 				this.explode();
 			}
@@ -991,9 +995,9 @@ var Bomb = makeClass(new (function(){
 		for (var i = 0; i < 10; ++i) {
 			var scale = Math.random() * 2;
 			game.addObj(new Cloud({
-				pos : new vec2(this.posX, this.posY),
-				vel : new vec2(Math.random()*2-1, Math.random()*2-1),
-				scale : new vec2(scale+1, scale+1),
+				pos : [this.posX, this.posY],
+				vel : [Math.random()*2-1, Math.random()*2-1],
+				scale : [scale+1, scale+1],
 				life : 5 - scale
 			}))
 		}
@@ -1084,10 +1088,10 @@ var Bomb = makeClass(new (function(){
 		for (var i = 0; i < 3; ++i) {
 			var c = Math.random();
 			game.addObj(new Particle({
-				vel : new vec2(Math.random()*2-1, Math.random()*2-1),
-				pos : new vec2(x,y),
+				vel : [Math.random()*2-1, Math.random()*2-1],
+				pos : [x,y],
 				life : Math.random() * .5 + .5,
-				color : new vec4(1,c,c*Math.random()*Math.random(),1),
+				color : [1,c,c*Math.random()*Math.random(),1],
 				radius : Math.random() + .5
 			}));
 		}
@@ -1947,8 +1951,8 @@ this.levelData = levelData;
 //		}
 	
 	
-		this.width = c.canvas.width;//c.getWidth();
-		this.height = c.canvas.height;//c.getHeight();
+		this.width = game.canvas.width;//c.getWidth();
+		this.height = game.canvas.height;//c.getHeight();
 		this.TILE_HEIGHT = this.height / this.MAP_HEIGHT;
 		this.TILE_WIDTH = this.TILE_HEIGHT;
 		this.setFontSize(this.TILE_HEIGHT);
@@ -2208,8 +2212,8 @@ var ChooseLevels = makeClass({
 						if (db == levelDB && getCookie('completed'+i) == '1') {
 							var c = chooseCanvas.getContext('2d');
 							c.globalAlpha = .75;
-							c.fillStyle = '#ffffff';
-							c.fillRect(0,0,c.canvas.width,c.canvas.height);
+							c.fillStyle = '#fff';
+							c.fillRect(0,0,game.canvas.width,game.canvas.height);
 							c.globalAlpha = 1;
 						}
 					});
@@ -2472,6 +2476,14 @@ function onkeypress(event) {
 }
 
 $(document).ready(function(){
+
+	/*
+	canvas = $('#game-canvas');
+	canvas.disableSelection();
+	glutil = new GLUtil({canvas:canvas.get(0)});
+	gl = glutil.context;
+	*/
+
 	$(window).resize(onresize);
 	Game.prototype.staticInit();
 	GameNumbers.prototype.staticInit();
@@ -2527,17 +2539,17 @@ $(document).ready(function(){
 
 var buttons = [];
 
-var buttonBorder = new vec2(.02, .04);
-var buttonSeparation = new vec2(.005, .01);
-var buttonSize = new vec2(.1, .2);
+var buttonBorder = [.02, .04];
+var buttonSeparation = [.005, .01];
+var buttonSize = [.1, .2];
 
 //these measurements are great... for landscape mode
 var buttonInfos = [
-	{cmd:'left', url:'icons/left.png', bbox:new box2(buttonBorder.x, 1-buttonBorder.y-buttonSize.y, buttonBorder.x+buttonSize.x, 1-buttonBorder.y)},
-	{cmd:'down', url:'icons/down.png', bbox:new box2(buttonBorder.x+buttonSize.x+buttonSeparation.x, 1-buttonBorder.y-buttonSize.y, buttonBorder.x+2*buttonSize.x+buttonSeparation.x, 1-buttonBorder.y)},
-	{cmd:'up', url:'icons/up.png', bbox:new box2(buttonBorder.x+buttonSize.x+buttonSeparation.x, 1-buttonBorder.y-buttonSize.y*2-buttonSeparation.y, buttonBorder.x+2*buttonSize.x+buttonSeparation.x, 1-buttonBorder.y-buttonSize.y-buttonSeparation.y)},
-	{cmd:'right', url:'icons/right.png', bbox:new box2(buttonBorder.x+buttonSize.x*2+buttonSeparation.x*2, 1-buttonBorder.y-buttonSize.y, buttonBorder.x+3*buttonSize.x+buttonSeparation.x*2, 1-buttonBorder.y)},
-	{cmd:'fire', url:'icons/ok.png', bbox:new box2(1-buttonBorder.x-buttonSize.x, 1-buttonBorder.y-buttonSize.y, 1-buttonBorder.x, 1-buttonBorder.y)}
+	{cmd:'left', url:'icons/left.png', bbox:{min:[buttonBorder[0], 1-buttonBorder[1]-buttonSize[1]], max:[buttonBorder[0]+buttonSize[0], 1-buttonBorder[1]]}},
+	{cmd:'down', url:'icons/down.png', bbox:{min:[buttonBorder[0]+buttonSize[0]+buttonSeparation[0], 1-buttonBorder[1]-buttonSize[1]], max:[buttonBorder[0]+2*buttonSize[0]+buttonSeparation[0], 1-buttonBorder[1]]}},
+	{cmd:'up', url:'icons/up.png', bbox:{min:[buttonBorder[0]+buttonSize[0]+buttonSeparation[0], 1-buttonBorder[1]-buttonSize[1]*2-buttonSeparation[1]], max:[buttonBorder[0]+2*buttonSize[0]+buttonSeparation[0], 1-buttonBorder[1]-buttonSize[1]-buttonSeparation[1]]}},
+	{cmd:'right', url:'icons/right.png', bbox:{min:[buttonBorder[0]+buttonSize[0]*2+buttonSeparation[0]*2, 1-buttonBorder[1]-buttonSize[1]], max:[buttonBorder[0]+3*buttonSize[0]+buttonSeparation[0]*2, 1-buttonBorder[1]]}},
+	{cmd:'fire', url:'icons/ok.png', bbox:{min:[1-buttonBorder[0]-buttonSize[0], 1-buttonBorder[1]-buttonSize[1]], max:[1-buttonBorder[0], 1-buttonBorder[1]]}}
 ];
 
 function editorHandleScreenEvent(event, press) {
@@ -2604,7 +2616,7 @@ var Button = makeClass({
 	init : function(args) {
 		var thiz = this;
 		this.bbox = args.bbox;
-		this.screenBBox = new box2();
+		this.screenBBox = {min:[0,0], max:[0,0]};
 		this.cmd = args.cmd;
 		this.url = args.url;
 		this.dom = $('<div>', {
@@ -2644,28 +2656,28 @@ var Button = makeClass({
 		//TODO this is good when we are landscape.
 		//base portrait on the same spaces, and anchor it to the closest respective corner
 		if (width > height) {
-			this.screenBBox.min.x = parseInt(width * this.bbox.min.x);
-			this.screenBBox.min.y = parseInt(height * this.bbox.min.y);
-			this.screenBBox.max.x = parseInt(width * this.bbox.max.x);
-			this.screenBBox.max.y = parseInt(height * this.bbox.max.y);
+			this.screenBBox.min[0] = parseInt(width * this.bbox.min[0]);
+			this.screenBBox.min[1] = parseInt(height * this.bbox.min[1]);
+			this.screenBBox.max[0] = parseInt(width * this.bbox.max[0]);
+			this.screenBBox.max[1] = parseInt(height * this.bbox.max[1]);
 		} else {
-			this.screenBBox.min.y = parseInt(width * this.bbox.min.y);
-			this.screenBBox.max.y = parseInt(width * this.bbox.max.y);
-			this.screenBBox.min.x = parseInt(height * this.bbox.min.x);
-			this.screenBBox.max.x = parseInt(height * this.bbox.max.x);
-			if (this.bbox.min.x < 1 - this.bbox.max.x) {
-				this.screenBBox.min.x = parseInt(height * this.bbox.min.x);
+			this.screenBBox.min[1] = parseInt(width * this.bbox.min[1]);
+			this.screenBBox.max[1] = parseInt(width * this.bbox.max[1]);
+			this.screenBBox.min[0] = parseInt(height * this.bbox.min[0]);
+			this.screenBBox.max[0] = parseInt(height * this.bbox.max[0]);
+			if (this.bbox.min[0] < 1 - this.bbox.max[0]) {
+				this.screenBBox.min[0] = parseInt(height * this.bbox.min[0]);
 			} else {
-				this.screenBBox.min.x = parseInt(width - height * (1 - this.bbox.min.x));
+				this.screenBBox.min[0] = parseInt(width - height * (1 - this.bbox.min[0]));
 			}
-			this.screenBBox.max.x = this.screenBBox.min.x + parseInt(height * (this.bbox.max.x - this.bbox.min.x));
-			this.screenBBox.min.y = parseInt(height - width * (1 - this.bbox.min.y));
-			this.screenBBox.max.y = this.screenBBox.min.y + parseInt(width * (this.bbox.max.y - this.bbox.min.y));
+			this.screenBBox.max[0] = this.screenBBox.min[0] + parseInt(height * (this.bbox.max[0] - this.bbox.min[0]));
+			this.screenBBox.min[1] = parseInt(height - width * (1 - this.bbox.min[1]));
+			this.screenBBox.max[1] = this.screenBBox.min[1] + parseInt(width * (this.bbox.max[1] - this.bbox.min[1]));
 		}
-		this.dom.style.left = this.screenBBox.min.x+'px';
-		this.dom.style.top = this.screenBBox.min.y+'px';
-		this.dom.style.width = (this.screenBBox.max.x - this.screenBBox.min.x) + 'px';
-		this.dom.style.height = (this.screenBBox.max.y - this.screenBBox.min.y) + 'px';
+		this.dom.style.left = this.screenBBox.min[0]+'px';
+		this.dom.style.top = this.screenBBox.min[1]+'px';
+		this.dom.style.width = (this.screenBBox.max[0] - this.screenBBox.min[0]) + 'px';
+		this.dom.style.height = (this.screenBBox.max[1] - this.screenBBox.min[1]) + 'px';
 	}
 });
 
