@@ -1425,6 +1425,8 @@ var Player = makeClass(new (function(){
 	};
 })());
 
+var Key;
+
 var Money = makeClass(new (function(){
 	this.super = BaseObj;
 
@@ -1476,25 +1478,14 @@ var Money = makeClass(new (function(){
 		}
 		
 		game.removeObj(this);
-		
-		var key = undefined;
-		var moneyleft = 0;
-		$.each(game.objs, function(_o,o) {
-			if (o.removeMe) return true;	//continue
-			if (o.isa(Money)) {
-				moneyleft++;
-			} else if (o.isa(Key)) {
-				key = o;
-			}
+
+		$.each(game.objs, function(i,o) {
+			if (o.isa(Key)) o.checkMoney();
 		});
-		if (moneyleft == 0) {
-			//throw an exception if there's no key
-			if (key) key.show();
-		}
 	};
 })());
 
-var Key = makeClass(new (function(){
+Key = makeClass(new (function(){
 	this.super = BaseObj;
 
 	this.changeLevelTime = 0;
@@ -1508,6 +1499,8 @@ var Key = makeClass(new (function(){
 		this.isBlocking = false;
 		this.blocksExplosion = false;
 		this.setSeq(Animation.prototype.SEQ_KEY_GREY);
+	
+		this.doFirstCheck = true;
 	};
 	
 	this.show = function() {
@@ -1542,12 +1535,32 @@ var Key = makeClass(new (function(){
 	
 	this.update = function(dt) {
 		Key.superProto.update.call(this, dt);
+		
 		if (this.changeLevelTime > 0 && this.changeLevelTime < game.time) {
 			if (!game.player.dead) {
 				game.nextLevel();
 			}
 		}
-	}
+	
+		//check for levels with no money
+		if (this.doFirstCheck) {
+			this.doFirstCheck = false;
+			this.checkMoney();
+		}
+	};
+
+	this.checkMoney = function() {
+		var moneyleft = 0;
+		$.each(game.objs, function(_o,o) {
+			if (o.removeMe) return true;	//continue
+			if (o.isa(Money)) moneyleft++;
+		});
+		if (moneyleft == 0) {
+			//throw an exception if there's no key
+			this.show();
+		}
+
+	};
 })());
 
 var Game = makeClass({
