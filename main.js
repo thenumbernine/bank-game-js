@@ -1584,8 +1584,8 @@ var Game = makeClass({
 	//TODO - keep this 1-1 with MAPTYPE_***
 	mapTypes : [
 		new MapType('ground', 0),
-		new MapType('tree', MapType.prototype.CANNOT_PASSTHRU | MapType.prototype.BLOCKS_EXPLOSIONS | MapType.prototype.DRAW_GROUND_UNDER),
-		new MapType('bricks', MapType.prototype.CANNOT_PASSTHRU | MapType.prototype.BLOCKS_GUNSHOT | MapType.prototype.BOMBABLE | MapType.prototype.BLOCKS_EXPLOSIONS),
+		new MapType('tree', MapType.prototype.CANNOT_PASSTHRU | MapType.prototype.DRAW_GROUND_UNDER),
+		new MapType('bricks', MapType.prototype.CANNOT_PASSTHRU | MapType.prototype.BLOCKS_GUNSHOT | MapType.prototype.BLOCKS_EXPLOSIONS | MapType.prototype.BOMBABLE),
 		new MapType('stone', MapType.prototype.CANNOT_PASSTHRU | MapType.prototype.BLOCKS_GUNSHOT | MapType.prototype.BLOCKS_EXPLOSIONS),
 		new MapType('water', MapType.prototype.CANNOT_PASSTHRU),
 	],
@@ -2238,7 +2238,7 @@ var ChooseLevels = makeClass({
 					
 						if (db == levelDB && getCookie('completed'+i) == '1') {
 							var c = chooseCanvas.getContext('2d');
-							c.globalAlpha = .75;
+							c.globalAlpha = .5;
 							c.fillStyle = '#fff';
 							c.fillRect(0,0,game.canvas.width,game.canvas.height);
 							c.globalAlpha = 1;
