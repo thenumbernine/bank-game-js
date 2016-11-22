@@ -286,10 +286,6 @@ var BaseObj = makeClass(new (function(){
 
 	//helpful for subclasses.  TODO - move somewhere else
 	this.linfDist = function(ax, ay, bx, by) {
-		ax = .5 * parseInt(ax * 2);
-		ay = .5 * parseInt(ay * 2);
-		bx = .5 * parseInt(bx * 2);
-		by = .5 * parseInt(by * 2);
 		var dx = ax - bx;
 		var dy = ay - by;
 		var adx = dx < 0 ? -dx : dx;
@@ -890,10 +886,10 @@ var Bomb = makeClass(new (function(){
 		if (this.state == this.STATE_IDLE || this.state == this.STATE_LIVE) {
 			//TODO - will this get skipped if it gets pushed immediately after it stopped moving across the last tile?
 			if (!this.moveFracMoving) {	//not moving at the moment
-				var typeUL = game.getMapTypeIndex((this.destPosX - .25), (this.destPosY - .25));
-				var typeUR = game.getMapTypeIndex((this.destPosX + .25), (this.destPosY - .25));
-				var typeLL = game.getMapTypeIndex((this.destPosX - .25), (this.destPosY + .25));
-				var typeLR = game.getMapTypeIndex((this.destPosX + .25), (this.destPosY + .25));
+				var typeUL = game.getMapTypeIndex(this.destPosX - .25, this.destPosY - .25);
+				var typeUR = game.getMapTypeIndex(this.destPosX + .25, this.destPosY - .25);
+				var typeLL = game.getMapTypeIndex(this.destPosX - .25, this.destPosY + .25);
+				var typeLR = game.getMapTypeIndex(this.destPosX + .25, this.destPosY + .25);
 
 				var thiz = this;
 				$.each(game.objs, function(_o,o) {
@@ -949,10 +945,10 @@ var Bomb = makeClass(new (function(){
 //						Log.w(this.getClass().getName(), "Bomb.update checking for a sink against " + o.getClass().getName());
 						
 						//now check all the types under this object
-						var typeUL = game.getMapTypeIndex((o.destPosX - .25), (o.destPosY - .25));
-						var typeUR = game.getMapTypeIndex((o.destPosX + .25), (o.destPosY - .25));
-						var typeLL = game.getMapTypeIndex((o.destPosX - .25), (o.destPosY + .25));
-						var typeLR = game.getMapTypeIndex((o.destPosX + .25), (o.destPosY + .25));
+						var typeUL = game.getMapTypeIndex(o.destPosX - .25, o.destPosY - .25);
+						var typeUR = game.getMapTypeIndex(o.destPosX + .25, o.destPosY - .25);
+						var typeLL = game.getMapTypeIndex(o.destPosX - .25, o.destPosY + .25);
+						var typeLR = game.getMapTypeIndex(o.destPosX + .25, o.destPosY + .25);
 					
 						$.each(game.objs, function(_o2,o2) {
 							if (o2.removeMe) return true;//continue;
