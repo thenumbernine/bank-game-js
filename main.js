@@ -340,7 +340,7 @@ var BaseObj = makeClass(new (function(){
 			var data = imagedata.data;
 			var alpha = this.color !== undefined ? this.color[3] : 1;
 			for (var i = 0; i < data.length; i += 4) {
-				data[i+3] = data[i+3] * alpha < 128 ? 0 : 255;
+				data[i+3] = data[i+3] * alpha < 128 ? 0 : 63;
 			}
 			tmpctx.putImageData(imagedata, 0, 0);
 			
@@ -670,7 +670,6 @@ var Particle = makeClass(new (function(){
 	this.isBlocking = false;
 	this.isBlockingPushers = false;
 	this.blocksExplosion = false;
-	this.seq = Animation.prototype.SEQ_SPARK;
 
 	this.init = function(args) {
 		Particle.super.call(this);
@@ -682,7 +681,7 @@ var Particle = makeClass(new (function(){
 		this.setPos(args.pos[0], args.pos[1]);
 		this.startTime = game.time;
 		if (args.blend !== undefined) this.blend = args.blend;
-		this.setSeq(args.seq !== undefined ? args.seq : this.seq);
+		this.setSeq(args.seq !== undefined ? args.seq : Animation.prototype.SEQ_SPARK);
 	};
 	
 	this.update = function(dt) {
@@ -2524,6 +2523,7 @@ $(document).ready(function(){
 		.disableSelection();
 
 	$('#editor-page').mousedown(editorMouseEventHandler);
+	$('#editor-page').mousemove(editorMouseEventHandler);
 	$('#editor-page').mouseup(editorMouseEventHandler);
 
 	//init globals
@@ -2619,7 +2619,7 @@ function editorHandleScreenEvent(event, press) {
 	}
 }
 
-var mouseIntervalMethod = 0;
+var mouseIntervalMethod = 1;
 var mouseDownInterval;
 var lastMouseEvent;
 function editorMouseEventHandler(event) {
@@ -2642,7 +2642,7 @@ function editorMouseEventHandler(event) {
 			editorHandleScreenEvent(lastMouseEvent, true);
 			mouseDownInterval = setInterval(function() {
 				editorHandleScreenEvent(lastMouseEvent, true);
-			}, 300);
+			}, 50);
 		}
 	} else if (event.type == 'mouseup') {
 		editorHandleScreenEvent(lastMouseEvent, false);
