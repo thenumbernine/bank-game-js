@@ -159,7 +159,7 @@ Animation.prototype.frames = [
 	new Frame('bomb_sunk', 1, 0, Animation.prototype.SEQ_BOMB_SUNK),
 	
 	//spark
-	new Frame('dot', 1, 0, Animation.prototype.SEQ_SPARK),
+	new Frame('flame', 1, 0, Animation.prototype.SEQ_SPARK),
 	
 	//framer
 	new Frame('framer', 1, 0, Animation.prototype.SEQ_FRAMER),
@@ -285,7 +285,6 @@ var BaseObj = makeClass(new (function(){
 	this.blocksExplosion = true;
 		
 	this.blend = 'none';
-	this.color = [1,1,1,1];
 
 	//helpful for subclasses.  TODO - move somewhere else
 	this.linfDist = function(ax, ay, bx, by) {
@@ -630,6 +629,7 @@ var Cloud = makeClass(new (function(){
 	this.isBlocking = false;
 	this.isBlockingPushers = false;
 	this.blocksExplosion = false;
+	this.color = [1,1,1,1];
 
 	this.init = function(args) {
 		Cloud.super.call(this);
@@ -645,11 +645,11 @@ var Cloud = makeClass(new (function(){
 		Cloud.superProto.update.call(this, deltaTimeMS);
 
 		var dt = deltaTimeMS / 1000;
-		this.setPos(this.posX + dt * this.vel[0], this.posY + dt * this.vel[1]);
+		//this.setPos(this.posX + dt * this.vel[0], this.posY + dt * this.vel[1]);
 
 		var frac = (game.gameTime - this.startTimeMS)/1000 / this.life;
 		if (frac > 1) frac = 1;
-		this.color.w = (1-frac)*(1-frac);
+		//this.color[3] = (1-frac)*(1-frac);
 
 		if (frac == 1) {
 			game.removeObj(this);
@@ -685,7 +685,7 @@ var Particle = makeClass(new (function(){
 
 		var frac = 1 - (game.gameTime - this.startTimeMS)/1000 / this.life;
 		if (frac < 0) frac = 0;
-		this.color.w = this.srccolor.w * frac;
+		this.color[3] = this.srccolor[3] * frac;
 
 		if (frac == 0) {
 			game.removeObj(this);
@@ -1090,9 +1090,9 @@ var Bomb = makeClass(new (function(){
 			game.addObj(new Particle({
 				vel : [Math.random()*2-1, Math.random()*2-1],
 				pos : [x,y],
-				life : Math.random() * .5 + .5,
+				life : .5 * (Math.random() * .5 + .5),
 				color : [1,c,c*Math.random()*Math.random(),1],
-				radius : Math.random() + .5
+				radius : .25 * (Math.random() + .5)
 			}));
 		}
 	};
@@ -2498,8 +2498,6 @@ $(document).ready(function(){
 	$('#editor-page').mousedown(editorMouseEventHandler);
 	$('#editor-page').mouseup(editorMouseEventHandler);
 
-	update();
-	
 	//init globals
 	anim = new Animation();
 	
@@ -2519,6 +2517,20 @@ $(document).ready(function(){
 	});
 	//preload
 	$(imgs).preload(function(){	
+		//now make gl textures for all images
+		/*
+		$.each(imgs, function(i,img) {
+			img.tex = new glutil.Texture2D({
+				flipY : false,
+				dontPremultiplyAlpha : true,
+				data : img,
+				minFilter : gl.LINEAR,
+				magFilter : gl.LINEAR,
+				generateMipmap : true
+			});
+		});
+		*/
+
 		//if get params have a level, then just play it
 		var level = $.url().param('level');
 		if (level !== undefined) {
@@ -2530,6 +2542,8 @@ $(document).ready(function(){
 	}, function(percent) {
 		$('#loading').attr('value', parseInt(100*percent));
 	});
+	
+	update();
 });
 
 
