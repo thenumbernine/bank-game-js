@@ -199,9 +199,11 @@ var GameNumbers = makeClass(new (function(){
 			rect.top = (y - .25) * game.TILE_HEIGHT;
 			rect.bottom = rect.top + game.TILE_HEIGHT/2;
 
-			c.drawImage(bitmap, 
-				rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top
-			);
+			try {
+				c.drawImage(bitmap, 
+					rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top
+				);
+			} catch (e) {}
 		}
 	};
 })());
@@ -284,7 +286,7 @@ var BaseObj = makeClass(new (function(){
 	this.isBlockingPushers = true;
 	this.blocksExplosion = true;
 		
-	this.blend = 'none';
+	this.blend = 'source-over';
 
 	//helpful for subclasses.  TODO - move somewhere else
 	this.linfDist = function(ax, ay, bx, by) {
@@ -319,11 +321,7 @@ var BaseObj = makeClass(new (function(){
 		var bitmap = frame.bitmap;
 		if (!bitmap) throw 'failed to find bitmap for frame '+this.frameId;
 
-		if (this.blend == 'add') {
-			c.globalCompositeOperation = 'lighter';
-		} else {
-			c.globalCompositeOperation = 'source-over';
-		}
+		c.globalCompositeOperation = this.blend;
 
 		if (this.color !== undefined) {
 			c.globalAlpha = this.color[3];
@@ -331,10 +329,15 @@ var BaseObj = makeClass(new (function(){
 				+parseInt(this.color[0]*255)+','
 				+parseInt(this.color[1]*255)+','
 				+parseInt(this.color[2]*255)+')';
+		} else {
+			c.globalAlpha = 1;
+			c.fillStyle = '#fff';
 		}
 
-		c.drawImage(bitmap, rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top);
-	
+		try {
+			c.drawImage(bitmap, rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top);
+		} catch (e) {}
+
 		if (this.color !== undefined) {
 			c.fillStyle = '#fff';
 			c.globalAlpha = 1;
@@ -629,8 +632,7 @@ var Cloud = makeClass(new (function(){
 	this.isBlocking = false;
 	this.isBlockingPushers = false;
 	this.blocksExplosion = false;
-	this.color = [1,1,1,1];
-
+	
 	this.init = function(args) {
 		Cloud.super.call(this);
 		this.vel = args.vel;
@@ -639,17 +641,18 @@ var Cloud = makeClass(new (function(){
 		this.setPos(args.pos[0], args.pos[1]);
 		this.startTimeMS = game.gameTime;
 		this.setSeq(Animation.prototype.SEQ_CLOUD);
+		this.color = [1,1,1,1];
 	};
 
 	this.update = function(deltaTimeMS) {
 		Cloud.superProto.update.call(this, deltaTimeMS);
 
 		var dt = deltaTimeMS / 1000;
-		//this.setPos(this.posX + dt * this.vel[0], this.posY + dt * this.vel[1]);
+		this.setPos(this.posX + dt * this.vel[0], this.posY + dt * this.vel[1]);
 
 		var frac = (game.gameTime - this.startTimeMS)/1000 / this.life;
 		if (frac > 1) frac = 1;
-		//this.color[3] = (1-frac)*(1-frac);
+		this.color[3] = (1-frac)*(1-frac);
 
 		if (frac == 1) {
 			game.removeObj(this);
@@ -663,7 +666,7 @@ var Particle = makeClass(new (function(){
 	this.isBlocking = false;
 	this.isBlockingPushers = false;
 	this.blocksExplosion = false;
-	this.blend = 'add';
+	this.blend = 'lighter';
 
 	this.init = function(args) {
 		Particle.super.call(this);
@@ -997,7 +1000,7 @@ var Bomb = makeClass(new (function(){
 			game.addObj(new Cloud({
 				pos : [this.posX, this.posY],
 				vel : [Math.random()*2-1, Math.random()*2-1],
-				scale : [scale+1, scale+1],
+				scale : scale+1,
 				life : 5 - scale
 			}))
 		}
@@ -1448,9 +1451,9 @@ var Money = makeClass(new (function(){
 			var gloveBitmap = gloveFrame.bitmap;
 			rect.left = (rect.left + rect.right) / 2;
 			rect.bottom = (rect.top + rect.bottom) / 2;
-			c.drawImage( gloveBitmap, 
-				rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top
-			);
+			try {
+				c.drawImage( gloveBitmap, rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top);
+			} catch (e) {}
 		}
 	};
 
@@ -1975,14 +1978,18 @@ this.levelData = levelData;
 				//c.drawBitmap(t.bitmap, i * TILE_WIDTH, j * TILE_HEIGHT, undefined);
 				
 				if ((t.flags & MapType.prototype.DRAW_GROUND_UNDER) != 0) {
-					c.drawImage(this.mapTypes[this.MAPTYPE_EMPTY].bitmap, 
+					try {
+						c.drawImage(this.mapTypes[this.MAPTYPE_EMPTY].bitmap, 
+							this.rect.left, this.rect.top, this.rect.right - this.rect.left, this.rect.bottom - this.rect.top
+						);
+					} catch (e) {}
+				}
+		
+				try {
+					c.drawImage(t.bitmap, 
 						this.rect.left, this.rect.top, this.rect.right - this.rect.left, this.rect.bottom - this.rect.top
 					);
-				}
-			
-				c.drawImage(t.bitmap, 
-					this.rect.left, this.rect.top, this.rect.right - this.rect.left, this.rect.bottom - this.rect.top
-				);
+				} catch (e) {}
 			}
 		}
 		
