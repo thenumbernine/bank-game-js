@@ -309,41 +309,62 @@ var BaseObj = makeClass(new (function(){
 		if (this.frameId < 0 || this.frameId >= anim.frames.length) return;
 		
 		var paddingX = game.canvas.width - game.MAP_WIDTH * game.TILE_WIDTH;
-		
+	
+		var w = game.TILE_WIDTH * this.scale[0];
+		var h = game.TILE_HEIGHT * this.scale[1];
+
 		rect.left = (this.posX - .5 * this.scale[0]) * game.TILE_WIDTH + paddingX;
-		rect.right = rect.left + game.TILE_WIDTH * this.scale[0];
+		rect.right = rect.left + w;
 		rect.top = (this.posY - .5 * this.scale[1]) * game.TILE_HEIGHT;
-		rect.bottom = rect.top + game.TILE_HEIGHT * this.scale[1];
+		rect.bottom = rect.top + h;
 		
 		var frame = anim.frames[this.frameId];
 		if (!frame) throw 'failed to find frame for id '+this.frameId;
 		
 		var bitmap = frame.bitmap;
 		if (!bitmap) throw 'failed to find bitmap for frame '+this.frameId;
-
-		c.globalCompositeOperation = this.blend;
-
-		if (this.color !== undefined) {
-			c.globalAlpha = this.color[3];
-			c.fillStyle = 'rgb('
-				+parseInt(this.color[0]*255)+','
-				+parseInt(this.color[1]*255)+','
-				+parseInt(this.color[2]*255)+')';
+		
+		if (this.blend == 'alpha-threshold') {	
+			var tmpcanvas = document.createElement('canvas');
+			tmpcanvas.width = rect.right - rect.left; 
+			tmpcanvas.height = rect.bottom - rect.top;
+			
+			var tmpctx = tmpcanvas.getContext('2d');
+			tmpctx.drawImage(bitmap, 0, 0, w, h);
+			var imagedata = tmpctx.getImageData(0, 0, w, h);
+			var data = imagedata.data;
+			var alpha = this.color !== undefined ? this.color[3] : 1;
+			for (var i = 0; i < data.length; i += 4) {
+				data[i+3] = data[i+3] * alpha < 128 ? 0 : 255;
+			}
+			tmpctx.putImageData(imagedata, 0, 0);
+			
+			c.fillStyle = '#fff';
+			c.globalAlpha = 1;
+			c.globalCompositeOperation = 'source-over';
+			c.drawImage(tmpcanvas, rect.left, rect.top, w, h);
 		} else {
-			c.globalAlpha = 1;
+			c.globalCompositeOperation = this.blend;
+
+			if (this.color !== undefined) {
+				c.globalAlpha = this.color[3];
+				c.fillStyle = 'rgb('
+					+parseInt(this.color[0]*255)+','
+					+parseInt(this.color[1]*255)+','
+					+parseInt(this.color[2]*255)+')';
+			} else {
+				c.globalAlpha = 1;
+				c.fillStyle = '#fff';
+			}
+
+			try {
+				c.drawImage(bitmap, rect.left, rect.top, w, h);
+			} catch (e) {}
+
 			c.fillStyle = '#fff';
-		}
-
-		try {
-			c.drawImage(bitmap, rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top);
-		} catch (e) {}
-
-		if (this.color !== undefined) {
-			c.fillStyle = '#fff';
 			c.globalAlpha = 1;
+			c.globalCompositeOperation = 'source-over';
 		}
-
-		c.globalCompositeOperation = 'source-over';
 	};
 	
 	//whether sentry can walk over it
@@ -632,7 +653,8 @@ var Cloud = makeClass(new (function(){
 	this.isBlocking = false;
 	this.isBlockingPushers = false;
 	this.blocksExplosion = false;
-	
+	this.blend = 'alpha-threshold';
+
 	this.init = function(args) {
 		Cloud.super.call(this);
 		this.vel = args.vel;
