@@ -2525,10 +2525,12 @@ $(document).ready(function(){
 	Game.prototype.staticInit();
 	GameNumbers.prototype.staticInit();
 	
+	var fontSize = 24;
 	var buttonBorder = [.02, .04];
 	var buttonSeparation = [.005, .01];
 	var buttonSize = [.1, .2];
 	buttonSys.init({
+		fontSize : fontSize,
 		callback : handleButtonCommand,
 		buttons : [
 			{cmd:'left', url:'icons/left.png', bbox:{min:[buttonBorder[0], 1-buttonBorder[1]-buttonSize[1]], max:[buttonBorder[0]+buttonSize[0], 1-buttonBorder[1]]}},

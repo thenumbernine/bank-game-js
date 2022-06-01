@@ -1,22 +1,20 @@
 //touch screen stuff
-//TODO make everything below this point its own thing in its own file
-//and include it in this file
 
 var Button = makeClass({
-	fontSize : 24,
 	init : function(args) {
 		var thiz = this;
 		this.bbox = args.bbox;
 		this.screenBBox = {min:[0,0], max:[0,0]};
 		this.cmd = args.cmd;
 		this.url = args.url;
+		var fontSize = args.fontSize || 24;
 		var callback = assertExists(args, 'callback');
 		this.dom = $('<div>', {
 			css:{
 				backgroundColor:'rgb(255,255,255)',
 				position:'absolute',
 				textAlign:'center',
-				fontSize:Math.ceil(this.fontSize*.65)+'pt',
+				fontSize:Math.ceil(fontSize*.65)+'pt',
 				background:'url('+args.url+') no-repeat',
 				backgroundSize:'100%',
 				zIndex:1
@@ -76,6 +74,7 @@ var Button = makeClass({
 var buttonSys = new function() {
 	/*
 	args:
+		fontSize
 		callback = button event handler : function(string cmd, boolean press);
 		buttons = [
 			{
@@ -90,6 +89,7 @@ var buttonSys = new function() {
 		this.buttons = [];
 		for (var i = 0; i < args.buttons.length; i++) {
 			var buttonInfo = args.buttons[i];
+			buttonInfo.fontSize = args.fontSize;
 			buttonInfo.callback = args.callback;
 			this.buttons.push(new Button(buttonInfo));
 		}
