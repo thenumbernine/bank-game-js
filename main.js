@@ -1665,9 +1665,9 @@ var Game = makeClass({
 	//static
 	gamepadToggle : function() {
 		if ($('#gamepad-checkbox').is(':checked')) {
-			showButtons();
+			buttonSys.show();
 		} else {
-			hideButtons();
+			buttonSys.hide();
 		}
 	},
 
@@ -2133,7 +2133,7 @@ function saveUserLevels() {
 var Splash = makeClass({
 	show : function() {
 		clearGame();
-		hideButtons();
+		buttonSys.hide();
 		$.mobile.changePage('#splash-page');
 	},
 	start : function(args) {
@@ -2159,7 +2159,7 @@ var Splash = makeClass({
 
 var ChooseLevels = makeClass({
 	show : function() {
-		hideButtons();
+		buttonSys.hide();
 		$.mobile.changePage('#level-page');
 		this.refresh();
 	},
@@ -2280,7 +2280,7 @@ var Editor = makeClass(new (function(){
 	};
 	this.show = function() {
 		this.refresh();
-		hideButtons();
+		buttonSys.hide();
 		$.mobile.changePage('#editor-page');
 	};
 	this.refresh = function() {
@@ -2349,7 +2349,7 @@ var chooseLevels = new ChooseLevels();
 var editor = new Editor();
 
 function onresize() {
-	resizeButtons();
+	buttonSys.onresize();
 	var width = $(window).width();
 	var height = $(window).height();
 	var screenWidth = width - 50;
@@ -2380,7 +2380,7 @@ function update() {
 }
 
 
-function handleCommand(cmd, press) {
+function handleButtonCommand(cmd, press) {
 	if (!game) return;
 	if (press) {
 		switch (cmd) {
@@ -2524,7 +2524,20 @@ $(document).ready(function(){
 	$(window).resize(onresize);
 	Game.prototype.staticInit();
 	GameNumbers.prototype.staticInit();
-	initButtons();	
+	
+	var buttonBorder = [.02, .04];
+	var buttonSeparation = [.005, .01];
+	var buttonSize = [.1, .2];
+	buttonSys.init({
+		callback : handleButtonCommand,
+		buttons : [
+			{cmd:'left', url:'icons/left.png', bbox:{min:[buttonBorder[0], 1-buttonBorder[1]-buttonSize[1]], max:[buttonBorder[0]+buttonSize[0], 1-buttonBorder[1]]}},
+			{cmd:'down', url:'icons/down.png', bbox:{min:[buttonBorder[0]+buttonSize[0]+buttonSeparation[0], 1-buttonBorder[1]-buttonSize[1]], max:[buttonBorder[0]+2*buttonSize[0]+buttonSeparation[0], 1-buttonBorder[1]]}},
+			{cmd:'up', url:'icons/up.png', bbox:{min:[buttonBorder[0]+buttonSize[0]+buttonSeparation[0], 1-buttonBorder[1]-buttonSize[1]*2-buttonSeparation[1]], max:[buttonBorder[0]+2*buttonSize[0]+buttonSeparation[0], 1-buttonBorder[1]-buttonSize[1]-buttonSeparation[1]]}},
+			{cmd:'right', url:'icons/right.png', bbox:{min:[buttonBorder[0]+buttonSize[0]*2+buttonSeparation[0]*2, 1-buttonBorder[1]-buttonSize[1]], max:[buttonBorder[0]+3*buttonSize[0]+buttonSeparation[0]*2, 1-buttonBorder[1]]}},
+			{cmd:'fire', url:'icons/ok.png', bbox:{min:[1-buttonBorder[0]-buttonSize[0], 1-buttonBorder[1]-buttonSize[1]], max:[1-buttonBorder[0], 1-buttonBorder[1]]}}
+		]
+	});
 	
 	$(window)
 		.keydown(onkeydown)
@@ -2585,25 +2598,6 @@ $(document).ready(function(){
 });
 
 
-//touch screen stuff
-//TODO make everything below this point its own thing in its own file
-//and include it in this file
-
-var buttons = [];
-
-var buttonBorder = [.02, .04];
-var buttonSeparation = [.005, .01];
-var buttonSize = [.1, .2];
-
-//these measurements are great... for landscape mode
-var buttonInfos = [
-	{cmd:'left', url:'icons/left.png', bbox:{min:[buttonBorder[0], 1-buttonBorder[1]-buttonSize[1]], max:[buttonBorder[0]+buttonSize[0], 1-buttonBorder[1]]}},
-	{cmd:'down', url:'icons/down.png', bbox:{min:[buttonBorder[0]+buttonSize[0]+buttonSeparation[0], 1-buttonBorder[1]-buttonSize[1]], max:[buttonBorder[0]+2*buttonSize[0]+buttonSeparation[0], 1-buttonBorder[1]]}},
-	{cmd:'up', url:'icons/up.png', bbox:{min:[buttonBorder[0]+buttonSize[0]+buttonSeparation[0], 1-buttonBorder[1]-buttonSize[1]*2-buttonSeparation[1]], max:[buttonBorder[0]+2*buttonSize[0]+buttonSeparation[0], 1-buttonBorder[1]-buttonSize[1]-buttonSeparation[1]]}},
-	{cmd:'right', url:'icons/right.png', bbox:{min:[buttonBorder[0]+buttonSize[0]*2+buttonSeparation[0]*2, 1-buttonBorder[1]-buttonSize[1]], max:[buttonBorder[0]+3*buttonSize[0]+buttonSeparation[0]*2, 1-buttonBorder[1]]}},
-	{cmd:'fire', url:'icons/ok.png', bbox:{min:[1-buttonBorder[0]-buttonSize[0], 1-buttonBorder[1]-buttonSize[1]], max:[1-buttonBorder[0], 1-buttonBorder[1]]}}
-];
-
 function editorHandleScreenEvent(event, press) {
 	if ($.mobile.activePage.get(0).id == 'editor-page') {
 		if (!press) return;
@@ -2635,7 +2629,7 @@ var lastMouseEvent;
 function editorMouseEventHandler(event) {
 	if ($.mobile.activePage.get(0).id != 'game-page' &&
 		$.mobile.activePage.get(0).id != 'editor-page') return;
-	//showButtons();
+	//buttonSys.show();
 	//event.preventDefault();
 	lastMouseEvent = event;
 	if (event.type == 'mousedown') {
@@ -2660,113 +2654,5 @@ function editorMouseEventHandler(event) {
 			if (mouseDownInterval !== undefined) clearInterval(mouseDownInterval);
 			mouseDownInterval = undefined;
 		}
-	}
-}
-
-var fontSize = 24;
-var Button = makeClass({
-	init : function(args) {
-		var thiz = this;
-		this.bbox = args.bbox;
-		this.screenBBox = {min:[0,0], max:[0,0]};
-		this.cmd = args.cmd;
-		this.url = args.url;
-		this.dom = $('<div>', {
-			css:{
-				backgroundColor:'rgb(255,255,255)',
-				position:'absolute',
-				textAlign:'center',
-				fontSize:Math.ceil(fontSize*.65)+'pt',
-				background:'url('+args.url+') no-repeat',
-				backgroundSize:'100%',
-				zIndex:1
-			}
-		}).mousedown(function() {
-			handleCommand(thiz.cmd, true);
-		}).mouseup(function() {
-			handleCommand(thiz.cmd, false);
-		}).mouseleave(function() {
-			handleCommand(thiz.cmd, false);
-		}).bind('touchstart', function() {
-			handleCommand(thiz.cmd, true);
-		}).bind('touchend', function() {
-			handleCommand(thiz.cmd, false);
-		}).bind('touchcancel', function() {
-			handleCommand(thiz.cmd, false);
-		})
-			.fadeTo(0, .75)
-			.hide()
-			.appendTo(document.body).get(0);
-		this.dom.cmd = args.cmd;
-		//$(this.dom).fadeTo(0, 0);
-		$(this.dom).disableSelection();
-		this.refresh();
-	},
-	refresh : function() {
-		var width = $(window).width();
-		var height = $(window).height();
-		//TODO this is good when we are landscape.
-		//base portrait on the same spaces, and anchor it to the closest respective corner
-		if (width > height) {
-			this.screenBBox.min[0] = parseInt(width * this.bbox.min[0]);
-			this.screenBBox.min[1] = parseInt(height * this.bbox.min[1]);
-			this.screenBBox.max[0] = parseInt(width * this.bbox.max[0]);
-			this.screenBBox.max[1] = parseInt(height * this.bbox.max[1]);
-		} else {
-			this.screenBBox.min[1] = parseInt(width * this.bbox.min[1]);
-			this.screenBBox.max[1] = parseInt(width * this.bbox.max[1]);
-			this.screenBBox.min[0] = parseInt(height * this.bbox.min[0]);
-			this.screenBBox.max[0] = parseInt(height * this.bbox.max[0]);
-			if (this.bbox.min[0] < 1 - this.bbox.max[0]) {
-				this.screenBBox.min[0] = parseInt(height * this.bbox.min[0]);
-			} else {
-				this.screenBBox.min[0] = parseInt(width - height * (1 - this.bbox.min[0]));
-			}
-			this.screenBBox.max[0] = this.screenBBox.min[0] + parseInt(height * (this.bbox.max[0] - this.bbox.min[0]));
-			this.screenBBox.min[1] = parseInt(height - width * (1 - this.bbox.min[1]));
-			this.screenBBox.max[1] = this.screenBBox.min[1] + parseInt(width * (this.bbox.max[1] - this.bbox.min[1]));
-		}
-		this.dom.style.left = this.screenBBox.min[0]+'px';
-		this.dom.style.top = this.screenBBox.min[1]+'px';
-		this.dom.style.width = (this.screenBBox.max[0] - this.screenBBox.min[0]) + 'px';
-		this.dom.style.height = (this.screenBBox.max[1] - this.screenBBox.min[1]) + 'px';
-	}
-});
-
-//var hideFadeDuration = 5000;
-//var fadeButtonsTimeout = undefined;
-function showButtons() {
-	for (var i = 0; i < buttons.length; i++) {
-		var buttonDOM = buttons[i].dom;
-		//$(buttonDOM).fadeTo(0,0);
-		$(buttonDOM).show();
-		//$(buttonDOM).fadeTo(0, .75);
-	}
-	/*if (fadeButtonsTimeout) clearTimeout(fadeButtonsTimeout);
-	fadeButtonsTimeout = setTimeout(function() {
-		for (var i = 0; i < buttons.length; i++) {
-			var buttonDOM = buttons[i].dom;
-			$(buttonDOM).fadeTo(1000, 0);
-		}
-	}, hideFadeDuration);*/
-}
-
-function hideButtons() {
-	for (var i = 0; i < buttons.length; i++) {
-		var buttonDOM = buttons[i].dom;
-		$(buttonDOM).hide();
-	}
-}
-
-function initButtons() {
-	for (var i = 0; i < buttonInfos.length; i++) {
-		var buttonInfo = buttonInfos[i];
-		buttons.push(new Button(buttonInfo));
-	}
-}
-
-function resizeButtons() {
-	for (var i = 0; i < buttons.length; i++) {
-		buttons[i].refresh();
 	}
 }
