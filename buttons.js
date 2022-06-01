@@ -4,7 +4,7 @@ var Button = makeClass({
 	init : function(args) {
 		var thiz = this;
 		this.bbox = args.bbox;
-		this.screenBBox = {min:[0,0], max:[0,0]};
+		this.screenBBox = new box2({min:{x:0,y:0}, max:{x:0,y:0}});
 		this.cmd = args.cmd;
 		this.url = args.url;
 		var fontSize = args.fontSize || 24;
@@ -46,28 +46,28 @@ var Button = makeClass({
 		//TODO this is good when we are landscape.
 		//base portrait on the same spaces, and anchor it to the closest respective corner
 		if (width > height) {
-			this.screenBBox.min[0] = parseInt(width * this.bbox.min[0]);
-			this.screenBBox.min[1] = parseInt(height * this.bbox.min[1]);
-			this.screenBBox.max[0] = parseInt(width * this.bbox.max[0]);
-			this.screenBBox.max[1] = parseInt(height * this.bbox.max[1]);
+			this.screenBBox.min.x = parseInt(width * this.bbox.min.x);
+			this.screenBBox.min.y = parseInt(height * this.bbox.min.y);
+			this.screenBBox.max.x = parseInt(width * this.bbox.max.x);
+			this.screenBBox.max.y = parseInt(height * this.bbox.max.y);
 		} else {
-			this.screenBBox.min[1] = parseInt(width * this.bbox.min[1]);
-			this.screenBBox.max[1] = parseInt(width * this.bbox.max[1]);
-			this.screenBBox.min[0] = parseInt(height * this.bbox.min[0]);
-			this.screenBBox.max[0] = parseInt(height * this.bbox.max[0]);
-			if (this.bbox.min[0] < 1 - this.bbox.max[0]) {
-				this.screenBBox.min[0] = parseInt(height * this.bbox.min[0]);
+			this.screenBBox.min.y = parseInt(width * this.bbox.min.y);
+			this.screenBBox.max.y = parseInt(width * this.bbox.max.y);
+			this.screenBBox.min.x = parseInt(height * this.bbox.min.x);
+			this.screenBBox.max.x = parseInt(height * this.bbox.max.x);
+			if (this.bbox.min.x < 1 - this.bbox.max.x) {
+				this.screenBBox.min.x = parseInt(height * this.bbox.min.x);
 			} else {
-				this.screenBBox.min[0] = parseInt(width - height * (1 - this.bbox.min[0]));
+				this.screenBBox.min.x = parseInt(width - height * (1 - this.bbox.min.x));
 			}
-			this.screenBBox.max[0] = this.screenBBox.min[0] + parseInt(height * (this.bbox.max[0] - this.bbox.min[0]));
-			this.screenBBox.min[1] = parseInt(height - width * (1 - this.bbox.min[1]));
-			this.screenBBox.max[1] = this.screenBBox.min[1] + parseInt(width * (this.bbox.max[1] - this.bbox.min[1]));
+			this.screenBBox.max.x = this.screenBBox.min.x + parseInt(height * (this.bbox.max.x - this.bbox.min.x));
+			this.screenBBox.min.y = parseInt(height - width * (1 - this.bbox.min.y));
+			this.screenBBox.max.y = this.screenBBox.min.y + parseInt(width * (this.bbox.max.y - this.bbox.min.y));
 		}
-		this.dom.style.left = this.screenBBox.min[0]+'px';
-		this.dom.style.top = this.screenBBox.min[1]+'px';
-		this.dom.style.width = (this.screenBBox.max[0] - this.screenBBox.min[0]) + 'px';
-		this.dom.style.height = (this.screenBBox.max[1] - this.screenBBox.min[1]) + 'px';
+		this.dom.style.left = this.screenBBox.min.x+'px';
+		this.dom.style.top = this.screenBBox.min.y+'px';
+		this.dom.style.width = (this.screenBBox.max.x - this.screenBBox.min.x) + 'px';
+		this.dom.style.height = (this.screenBBox.max.y - this.screenBBox.min.y) + 'px';
 	}
 });
 
@@ -80,7 +80,7 @@ var buttonSys = new function() {
 			{
 				string cmd,
 				string url,
-				bbox = {min = [x,y], max = [x,y]}
+				box2 bbox (see /js/vec.js for box2)
 			},
 			...
 		]

@@ -2533,11 +2533,46 @@ $(document).ready(function(){
 		fontSize : fontSize,
 		callback : handleButtonCommand,
 		buttons : [
-			{cmd:'left', url:'icons/left.png', bbox:{min:[buttonBorder[0], 1-buttonBorder[1]-buttonSize[1]], max:[buttonBorder[0]+buttonSize[0], 1-buttonBorder[1]]}},
-			{cmd:'down', url:'icons/down.png', bbox:{min:[buttonBorder[0]+buttonSize[0]+buttonSeparation[0], 1-buttonBorder[1]-buttonSize[1]], max:[buttonBorder[0]+2*buttonSize[0]+buttonSeparation[0], 1-buttonBorder[1]]}},
-			{cmd:'up', url:'icons/up.png', bbox:{min:[buttonBorder[0]+buttonSize[0]+buttonSeparation[0], 1-buttonBorder[1]-buttonSize[1]*2-buttonSeparation[1]], max:[buttonBorder[0]+2*buttonSize[0]+buttonSeparation[0], 1-buttonBorder[1]-buttonSize[1]-buttonSeparation[1]]}},
-			{cmd:'right', url:'icons/right.png', bbox:{min:[buttonBorder[0]+buttonSize[0]*2+buttonSeparation[0]*2, 1-buttonBorder[1]-buttonSize[1]], max:[buttonBorder[0]+3*buttonSize[0]+buttonSeparation[0]*2, 1-buttonBorder[1]]}},
-			{cmd:'fire', url:'icons/ok.png', bbox:{min:[1-buttonBorder[0]-buttonSize[0], 1-buttonBorder[1]-buttonSize[1]], max:[1-buttonBorder[0], 1-buttonBorder[1]]}}
+			{
+				cmd:'left',
+				url:'icons/left.png',
+				bbox:new box2({
+					min:{x:buttonBorder[0], y:1-buttonBorder[1]-buttonSize[1]},
+					max:{x:buttonBorder[0]+buttonSize[0], y:1-buttonBorder[1]}
+				})
+			},
+			{
+				cmd:'down',
+				url:'icons/down.png',
+				bbox:new box2({
+					min:{x:buttonBorder[0]+buttonSize[0]+buttonSeparation[0], y:1-buttonBorder[1]-buttonSize[1]},
+					max:{x:buttonBorder[0]+2*buttonSize[0]+buttonSeparation[0], y:1-buttonBorder[1]}
+				})
+			},
+			{
+				cmd:'up',
+				url:'icons/up.png',
+				bbox:new box2({
+					min:{x:buttonBorder[0]+buttonSize[0]+buttonSeparation[0], y:1-buttonBorder[1]-buttonSize[1]*2-buttonSeparation[1]},
+					max:{x:buttonBorder[0]+2*buttonSize[0]+buttonSeparation[0], y:1-buttonBorder[1]-buttonSize[1]-buttonSeparation[1]}
+				})
+			},
+			{
+				cmd:'right',
+				url:'icons/right.png',
+				bbox:new box2({
+					min:{x:buttonBorder[0]+buttonSize[0]*2+buttonSeparation[0]*2, y:1-buttonBorder[1]-buttonSize[1]},
+					max:{x:buttonBorder[0]+3*buttonSize[0]+buttonSeparation[0]*2, y:1-buttonBorder[1]}
+				})
+			},
+			{
+				cmd:'fire',
+				url:'icons/ok.png',
+				bbox:new box2({
+					min:{x:1-buttonBorder[0]-buttonSize[0], y:1-buttonBorder[1]-buttonSize[1]},
+					max:{x:1-buttonBorder[0], y:1-buttonBorder[1]}
+				})
+			}
 		]
 	});
 	
