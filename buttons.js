@@ -19,18 +19,18 @@ var Button = makeClass({
 				backgroundSize:'100%',
 				zIndex:1
 			}
-		}).mousedown(function() {
-			callback(thiz.cmd, true);
-		}).mouseup(function() {
-			callback(thiz.cmd, false);
-		}).mouseleave(function() {
-			callback(thiz.cmd, false);
-		}).bind('touchstart', function() {
-			callback(thiz.cmd, true);
-		}).bind('touchend', function() {
-			callback(thiz.cmd, false);
-		}).bind('touchcancel', function() {
-			callback(thiz.cmd, false);
+		}).bind('mousedown', function(e) {
+			callback(thiz.cmd, true, e);
+		}).bind('mouseup', function(e) {
+			callback(thiz.cmd, false, e);
+		}).bind('mouseleave', function(e) {
+			callback(thiz.cmd, false, e);
+		}).bind('touchstart', function(e) {
+			callback(thiz.cmd, true, e);
+		}).bind('touchend', function(e) {
+			callback(thiz.cmd, false, e);
+		}).bind('touchcancel', function(e) {
+			callback(thiz.cmd, false, e);
 		})
 			.fadeTo(0, .75)
 			.hide()

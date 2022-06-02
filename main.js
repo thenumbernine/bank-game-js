@@ -117,6 +117,7 @@ Animation.prototype.framesForSeq = [];
 Animation.prototype.framesForSeq.length = Animation.prototype.SEQ_COUNT;
 	
 Animation.prototype.frames = [
+	//Frame init : function(bitmapId, duration, frameChange, sequenceMarker)
 	//player 
 		//stand up
 	new Frame('teeth_up', 1, 0, Animation.prototype.SEQ_PLAYER_STAND_UP),
@@ -1394,10 +1395,40 @@ var Player = makeClass(new (function(){
 		
 		if (this.dead) {
 			//setSeq(Animation.prototype.SEQ_PLAYER_DEAD);
-		} else if (this.moveFracMoving) {
-			this.setSeq(Animation.prototype.SEQ_PLAYER_WALK_UP + this.dir);
 		} else {
-			this.setSeq(Animation.prototype.SEQ_PLAYER_STAND_UP + this.dir);
+			if (this.moveFracMoving) {
+				switch (this.dir) {
+				case 0:
+					this.setSeq(Animation.prototype.SEQ_PLAYER_WALK_UP);
+					break;
+				case 1:
+				default:
+					this.setSeq(Animation.prototype.SEQ_PLAYER_WALK_DOWN);
+					break;
+				case 2:
+					this.setSeq(Animation.prototype.SEQ_PLAYER_WALK_LEFT);
+					break;
+				case 3:
+					this.setSeq(Animation.prototype.SEQ_PLAYER_WALK_RIGHT);
+					break;
+				}
+			} else {
+				switch (this.dir) {
+				case 0:
+					this.setSeq(Animation.prototype.SEQ_PLAYER_STAND_UP);
+					break;
+				case 1:
+				default:
+					this.setSeq(Animation.prototype.SEQ_PLAYER_STAND_DOWN);
+					break;
+				case 2:
+					this.setSeq(Animation.prototype.SEQ_PLAYER_STAND_LEFT);
+					break;
+				case 3:
+					this.setSeq(Animation.prototype.SEQ_PLAYER_STAND_RIGHT);
+					break;
+				}		
+			}
 		}
 	};
 	
@@ -2091,10 +2122,8 @@ this.levelData = levelData;
 Game.prototype.MAPTYPE_OOB = Game.prototype.MAPTYPE_STONE;
 
 function refreshLevels(done) {
-	$.ajax({
-		url:'levels.json',
-		dataType:'json'
-	}).fail(function(){
+	$.getJSON('levels.json')
+	.fail(function(){
 		alert('failed to load levels!');
 	}).done(function(d){
 		levelDB = d.levels;
@@ -2110,10 +2139,8 @@ function refreshUserLevels(done) {
 		thisUserLevelDB = [];
 	}
 
-	$.ajax({
-		url:'userlevels.json',
-		dataType:'json'
-	}).fail(function(){
+	$.getJSON('userlevels.json')
+	.fail(function(){
 		console.log('failed to load user levels!');
 	}).done(function(d){
 		allUsersLevelDB = d.levels;
