@@ -63,6 +63,7 @@ $(document).bind('mobileinit', function() {
 			<div data-role='content'>
 				<button data-inline='true' onclick='splash.start()'>Start</button>
 				<button data-inline='true' onclick='chooseLevels.show()'>Levels</button>
+				<button data-inline='true' onclick='showHelp()'>Help</button>
 			</div>
 		</div>
 		<div id='level-page' class='page' data-role='page'>
@@ -70,6 +71,38 @@ $(document).bind('mobileinit', function() {
 			<div data-role='content'>
 				<div id='level-page-content'></div>
 				<button data-inline='true' onclick='splash.show()'>Main Menu</button>
+			</div>
+		</div>
+		<div id='help-page' class='page' data-role='page'>
+			<div data-role='header'><h1>Help</h1></div>
+			<div data-role='content' style='text-align:left'>
+				<button data-role='inline' onclick='Game.prototype.close()'>Main Menu</button><br>
+
+				<img width=64 src='res/drawable/teeth_down_step.png'/> - This is you.  Your job is to first get all the money, then get they key, and then you can move on to the next level.<br>
+				<img width=64 src='res/drawable/ground.png'/> - This is the ground.  You can walk on it.<br>
+				<img width=64 src='res/drawable/money.png'/> - This is money.  You need this because there's an economic recession.
+					If money has a number on it then it contains a bomb, and getting the money will give you as many bombs.<br>
+				<img width=64 src='res/drawable/key_grey.png'/> 
+					<img width=64 src='res/drawable/key.png'/> - This is the key.  If it's grey then there's still money you need to get.  But if it's gold then you can touch it to end the level.<br>
+				<img width=64 src='res/drawable/bomb.png'/> - This is a bomb.  Some bombs will be already placed in the level, and some bombs can be collected by picking up money.
+					All bombs can be pushed.
+					If you collect a bomb from money then you can drop it with the 
+						<img width=16 src='icons/ok.png' alt='ok'/> button.
+					If you drop a bomb then it is lit and will detonate in a few short seconds.
+				
+					A bomb will have a number on it.  The number says how many tiles in each cardinal direction that the bomb will blast.
+					If you are standing on one of these blast squares then you'll die.
+					If another bomb is on a blast square then it will get lit.<br>
+				<img width=64 src='res/drawable/framer.png'/> - This is an emerald framer, I mean, a push-block.  You can push it.  It stops bomb blasts and enemy shots.<br>
+				<img width=64 src='res/drawable/bricks.png'/> - These are bricks.  You can't walk through them. But you can destroy them with bombs.<br>
+				<img width=64 src='res/drawable/tree.png'/> - This is a tree.  It's tough.  You can't destroy it with a bomb.  But your bomb blasts will go through it.<br>
+				<img width=64 src='res/drawable/stone.png'/> - This is stone.  It's tough.  You can't even destroy it with a bomb.  It will stop bomb blasts.<br>
+				<img width=64 src='res/drawable/water.png'/> - This is heavy water.  You can't swim in it (Google it).  But if you push a bomb in it, the bomb will float, and you can walk on the bomb.  But after some time the bomb will sink.<br>
+				<img width=64 src='res/drawable/medusa.png'/> 
+					<img width=64 src='res/drawable/medusa_pissed.png'/> - This is a gun.  It shoots in the 4 cardinal directions.  It can shoot through trees, but not through bricks or stones or push-blocks.  Bombs can't kill it.<br>
+				<img width=64 src='res/drawable/sentry1.png'/> - This is a sentry.  When it hits a wall it turns left.  Bombs can't kill it, but they will stop its movement.<br>
+
+				<button data-role='inline' onclick='Game.prototype.close()'>Main Menu</button><br>
 			</div>
 		</div>
 		<div id='editor-page' class='page' data-role='page'>

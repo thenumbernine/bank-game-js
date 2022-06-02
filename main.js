@@ -2263,6 +2263,11 @@ var ChooseLevels = makeClass({
 	}
 });
 
+function showHelp() {
+	buttonSys.hide();
+	$.mobile.changePage('#help-page');
+}
+
 function clearGame() {
 	if (!game) return;
 	game.removeAll();
