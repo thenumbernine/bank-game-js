@@ -2,61 +2,12 @@
 <html>
 	<head>
 		<meta charset='utf-8'/>
-		<!-- meta name="inmobi-site-verification" content="85c05d7efa9313501a25d92f5bba38bf" / -->
 		<title>Bank</title>
-		<!-- meta name="inmobi-site-verification" content="87a9f5b4915071986d1beb3eb7937751" / -->
 		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 		<meta name="apple-mobile-web-app-capable" content="yes"/>
 		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-		
-		<link rel="stylesheet" text="text/css" href="jquery.mobile-1.4.5.css"/>
 		<link rel="stylesheet" text="text/css" href="style.css"/>
-	
-		<!-- compatability with jquery-mobile 1.4.5 ... -->
-		<!-- works <script type="text/javascript" src="/js/jquery-1.11.1.min.js"></script>-->
-		<!-- works <script type="text/javascript" src="/js/jquery-2.1.0.min.js"></script>--> 
-		<!-- works <script type="text/javascript" src="/js/jquery-2.1.4.min.js"></script>-->
-		<!-- works --><script type="text/javascript" src="/js/jquery-2.2.4.min.js"></script>
-		<!-- doesn't work <script type="text/javascript" src="/js/jquery-3.0.0.min.js"></script>-->
-		<!-- doesn't work <script type="text/javascript" src="/js/jquery-3.1.0.min.js"></script>-->
-		<!-- doesn't work <script type="text/javascript" src="/js/jquery-3.4.1.min.js"></script>-->
-		
-		<script type="text/javascript" src="/js/purl.js"></script>
-		<script type="text/javascript" src="/js/util.js"></script>
-		<script type="text/javascript" src="/js/vec.js"></script>
-<script type="text/javascript">
-var _vec2 = vec2;
-var _vec3 = vec3;
-var _vec4 = vec4;
-</script>
-		<script type="text/javascript" src="/js/gl-matrix.2.2.0.min.js"></script>
-		<!-- script type="text/javascript" src="/js/gl-util.js"></script -->
-		<script type="text/javascript">
-$(document).bind('mobileinit', function() {
-	$.mobile.selectmenu.prototype.options.nativeMenu = false;
-	$.mobile.listview.prototype.options.dividerTheme = 'a';
-	$.mobile.hashListeningEnabled = false;			//select box change thing does url change
-	$.mobile.changePage.defaults.changeHash = false;	//clicking a button does a url change
-	$.mobile.changePage.defaults.transition = 'flip';
-	$.mobile.changePage.defaults.allowSamePageTransition = true;
-});
-		</script>
-		<script type="text/javascript" src="jquery.mobile-1.4.5.js"></script>
-		<script type="text/javascript" src="buttons.js"></script>
-		<script type="text/javascript" src="main.js"></script>
-
-<!--
-		<script type="text/javascript">
-			var _gaq = _gaq || [];
-			_gaq.push(['_setAccount', 'UA-17312646-3']);
-			_gaq.push(['_trackPageview']);
-			(function() {
-			var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
-			ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
-			var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
-			})();
-		</script>
--->
+		<script type="module" src="main.js" defer></script>
 	</head>
 	<body>
 		<div id='loading-page' class='page' data-role='page'>
@@ -69,22 +20,22 @@ $(document).bind('mobileinit', function() {
 		<div id='splash-page' class='page' data-role='page'>
 			<div data-role='header'><h1>Bank</h1></div>
 			<div data-role='content'>
-				<button data-inline='true' onclick='splash.start()'>Start</button>
-				<button data-inline='true' onclick='chooseLevels.show()'>Levels</button>
-				<button data-inline='true' onclick='showHelp()'>Help</button>
+				<button id='startButton'>Start</button>
+				<button id='chooseLevelsButton'>Levels</button>
+				<button id='helpButton'>Help</button>
 			</div>
 		</div>
 		<div id='level-page' class='page' data-role='page'>
 			<div data-role='header'><h1>Levels</h1></div>
 			<div data-role='content'>
 				<div id='level-page-content'></div>
-				<button data-inline='true' onclick='splash.show()'>Main Menu</button>
+				<button id='levelPageMainMenuButton'>Main Menu</button>
 			</div>
 		</div>
 		<div id='help-page' class='page' data-role='page'>
 			<div data-role='header'><h1>Help</h1></div>
 			<div data-role='content' style='text-align:left'>
-				<button data-role='inline' onclick='Game.prototype.close()'>Main Menu</button><br>
+				<button id='helpPageMainMenuButton'>Main Menu</button><br>
 
 				<img width=64 src='res/drawable/teeth_down_step.png'/> - This is you.  Your job is to first get all the money, then get they key, and then you can move on to the next level.
 					You can move with the arrow keys and place bombs with the space bar.
@@ -113,7 +64,7 @@ $(document).bind('mobileinit', function() {
 					<img width=64 src='res/drawable/medusa_pissed.png'/> - This is a gun.  It shoots in the 4 cardinal directions.  It can shoot through trees, but not through bricks or stones or push-blocks.  Bombs can't kill it.<br>
 				<img width=64 src='res/drawable/sentry1.png'/> - This is a sentry.  When it hits a wall it turns left.  Bombs can't kill it, but they will stop its movement.<br>
 
-				<button data-role='inline' onclick='Game.prototype.close()'>Main Menu</button><br>
+				<button id='helpPageMainMenuButton2'>Main Menu</button><br>
 			</div>
 		</div>
 		<div id='editor-page' class='page' data-role='page'>

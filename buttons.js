@@ -1,15 +1,18 @@
+import {DOM, assertExists, hide, show} from '/js/util.js';
+import {box2} from '/js/vec.js';
+
 //touch screen stuff
 
-var Button = makeClass({
-	init : function(args) {
-		var thiz = this;
+class Button {
+	constructor(args) {
+		let thiz = this;
 		this.bbox = args.bbox;
 		this.screenBBox = new box2({min:{x:0,y:0}, max:{x:0,y:0}});
 		this.cmd = args.cmd;
 		this.url = args.url;
-		var fontSize = args.fontSize || 24;
-		var callback = assertExists(args, 'callback');
-		this.dom = $('<div>', {
+		let fontSize = args.fontSize || 24;
+		let callback = assertExists(args, 'callback');
+		this.dom = DOM('div', {
 			css:{
 				backgroundColor:'rgb(255,255,255)',
 				position:'absolute',
@@ -17,32 +20,27 @@ var Button = makeClass({
 				fontSize:Math.ceil(fontSize*.65)+'pt',
 				background:'url('+args.url+') no-repeat',
 				backgroundSize:'100%',
-				zIndex:1
-			}
-		}).bind('mousedown', function(e) {
-			callback(thiz.cmd, true, e);
-		}).bind('mouseup', function(e) {
-			callback(thiz.cmd, false, e);
-		}).bind('mouseleave', function(e) {
-			callback(thiz.cmd, false, e);
-		}).bind('touchstart', function(e) {
-			callback(thiz.cmd, true, e);
-		}).bind('touchend', function(e) {
-			callback(thiz.cmd, false, e);
-		}).bind('touchcancel', function(e) {
-			callback(thiz.cmd, false, e);
-		})
-			.fadeTo(0, .75)
-			.hide()
-			.appendTo(document.body).get(0);
+				zIndex:1,
+				userSelect:'none',
+			},
+			appendTo : document.body,
+		}, {
+			mousedown : e => { callback(thiz.cmd, true, e); },
+			mouseup : e => { callback(thiz.cmd, false, e); },
+			mouseleave : e => { callback(thiz.cmd, false, e); },
+			touchstart : e => { callback(thiz.cmd, true, e); },
+			touchend : e => { callback(thiz.cmd, false, e); },
+			touchcancel : e => { callback(thiz.cmd, false, e); },
+		});
+		hide(this.dom);
 		this.dom.cmd = args.cmd;
-		//$(this.dom).fadeTo(0, 0);
-		$(this.dom).disableSelection();
+		//.fadeTo(0, .75)
+		//this.dom.fadeTo(0, 0);
 		this.refresh();
-	},
-	refresh : function() {
-		var width = $(window).width();
-		var height = $(window).height();
+	}
+	refresh() {
+		let width = window.innerWidth;
+		let height = window.innerHeight;
 		//TODO this is good when we are landscape.
 		//base portrait on the same spaces, and anchor it to the closest respective corner
 		if (width > height) {
@@ -69,9 +67,9 @@ var Button = makeClass({
 		this.dom.style.width = (this.screenBBox.max.x - this.screenBBox.min.x) + 'px';
 		this.dom.style.height = (this.screenBBox.max.y - this.screenBBox.min.y) + 'px';
 	}
-});
+}
 
-var buttonSys = new function() {
+class ButtonSys {
 	/*
 	args:
 		fontSize
@@ -85,44 +83,46 @@ var buttonSys = new function() {
 			...
 		]
 	*/
-	this.init = function(args) {
+	constructor(args) {
 		this.buttons = [];
-		for (var i = 0; i < args.buttons.length; i++) {
-			var buttonInfo = args.buttons[i];
+		for (let i = 0; i < args.buttons.length; i++) {
+			let buttonInfo = args.buttons[i];
 			buttonInfo.fontSize = args.fontSize;
 			buttonInfo.callback = args.callback;
 			this.buttons.push(new Button(buttonInfo));
 		}
-	};
+	}
 
-	//var hideFadeDuration = 5000;
-	//var fadeButtonsTimeout = undefined;
-	this.show = function() {
-		for (var i = 0; i < this.buttons.length; i++) {
-			var buttonDOM = this.buttons[i].dom;
-			//$(buttonDOM).fadeTo(0,0);
-			$(buttonDOM).show();
-			//$(buttonDOM).fadeTo(0, .75);
+	//let hideFadeDuration = 5000;
+	//let fadeButtonsTimeout = undefined;
+	show() {
+		for (let i = 0; i < this.buttons.length; i++) {
+			let buttonDOM = this.buttons[i].dom;
+			//buttonDOM.fadeTo(0,0);
+			show(buttonDOM);
+			//buttonDOM.fadeTo(0, .75);
 		}
 		/*if (fadeButtonsTimeout) clearTimeout(fadeButtonsTimeout);
 		fadeButtonsTimeout = setTimeout(function() {
-			for (var i = 0; i < this.buttons.length; i++) {
-				var buttonDOM = this.buttons[i].dom;
-				$(buttonDOM).fadeTo(1000, 0);
+			for (let i = 0; i < this.buttons.length; i++) {
+				let buttonDOM = this.buttons[i].dom;
+				buttonDOM.fadeTo(1000, 0);
 			}
 		}, hideFadeDuration);*/
-	};
+	}
 
-	this.hide = function() {
-		for (var i = 0; i < this.buttons.length; i++) {
-			var buttonDOM = this.buttons[i].dom;
-			$(buttonDOM).hide();
+	hide() {
+		for (let i = 0; i < this.buttons.length; i++) {
+			let buttonDOM = this.buttons[i].dom;
+			hide(buttonDOM);
 		}
-	};
+	}
 
-	this.onresize = function() {
-		for (var i = 0; i < this.buttons.length; i++) {
+	onresize() {
+		for (let i = 0; i < this.buttons.length; i++) {
 			this.buttons[i].refresh();
 		}
-	};
-};
+	}
+}
+
+export {ButtonSys};
