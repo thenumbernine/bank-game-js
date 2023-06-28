@@ -10,14 +10,14 @@
 		<script type="module" src="main.js" defer></script>
 	</head>
 	<body>
-		<div id='loading-page' class='page' data-role='page'>
+		<div id='loading-page' class='page'>
 			<div data-role='header'><h1>Bank</h1></div>
 			<div data-role='content'>
 				Loading...<br>
 				<progress id='loading' max='100' value='0'></progress>
 			</div>
 		</div>
-		<div id='splash-page' class='page' data-role='page'>
+		<div id='splash-page' class='page'>
 			<div data-role='header'><h1>Bank</h1></div>
 			<div data-role='content'>
 				<button id='startButton'>Start</button>
@@ -25,14 +25,14 @@
 				<button id='helpButton'>Help</button>
 			</div>
 		</div>
-		<div id='level-page' class='page' data-role='page'>
+		<div id='level-page' class='page'>
 			<div data-role='header'><h1>Levels</h1></div>
 			<div data-role='content'>
 				<div id='level-page-content'></div>
 				<button id='levelPageMainMenuButton'>Main Menu</button>
 			</div>
 		</div>
-		<div id='help-page' class='page' data-role='page'>
+		<div id='help-page' class='page'>
 			<div data-role='header'><h1>Help</h1></div>
 			<div data-role='content' style='text-align:left'>
 				<button id='helpPageMainMenuButton'>Main Menu</button><br>
@@ -67,13 +67,13 @@
 				<button id='helpPageMainMenuButton2'>Main Menu</button><br>
 			</div>
 		</div>
-		<div id='editor-page' class='page' data-role='page'>
+		<div id='editor-page' class='page'>
 			<div data-role='content'>
 				<div style='position:absolute; z-index:1; right:0px'>
-					<img onclick='splash.show()' src='close.png'/><br>
-					<button data-inline='true' onclick='editor.play()'>Play!</button><br>
-					<button data-inline='true' onclick='editor.save()'>Save</button><br>
-					<button data-inline='true' onclick='editor.submit()'>Submit</button><br>
+					<img id='editorPageClose' src='close.png'/><br>
+					<button id='editorPagePlay'>Play!</button><br>
+					<button id='editorPageSave'>Save</button><br>
+					<button id='editorPageSubmit'>Submit</button><br>
 				</div>
 				<div style='position:absolute; z-index:1; right:0px; bottom:0px'>
 					<select id='editor-select'>
@@ -116,22 +116,22 @@
 				<br>
 			</div>
 		</div>
-		<div id='game-page' class='page' style='overflow:hidden' data-role='page'>
+		<div id='game-page' class='page'>
 			<div data-role='content'>
 				<div style='position:absolute; z-index:2; right:0px; top:0px'>
-					<img width=30 style='padding:5px' src='images/menu.png' onclick='$("#dropdown").toggle()'/><br>
+					<img width=30 style='padding:5px; cursor:pointer' src='images/menu.png' id='gamePageMenu'/><br>
 					<div id='dropdown' style='display:none; position:absolute; z-index:3; right:0px'>
-						<button onclick='Game.prototype.skip()'>Skip</button>
-						<button onclick='Game.prototype.restart()'>Restart</button>
-						<input type='checkbox' id='gamepad-checkbox' onchange='Game.prototype.gamepadToggle()'/>
-						<label for='gamepad-checkbox'>Gamepad</label>
-						<button data-role='inline' onclick='editor.edit()'>Edit</button>
-						<button data-role='inline' onclick='Game.prototype.close()'>Main Menu</button>
+						<button id='gamePageSkip'>Skip</button>
+						<button id='gamePageRestart'>Restart</button>
+						<input type='checkbox' id='gamepad_checkbox'/>
+						<label for='gamepad_checkbox'>Gamepad</label>
+						<button id='gamePageEdit'>Edit</button>
+						<button id='gamePageClose'>Main Menu</button>
 					</div>	
 				</div>
 				<div id='game-stats' style='position:absolute; z-index:1; left:0px; bottom:0px'>
-					<span id='game-hud-bombs'></span> Bombs<br>
-					Level <span id='game-hud-level'></span><br>
+					<span id='game_hud_bombs'></span> Bombs<br>
+					Level <span id='game_hud_level'></span><br>
 				</div>
 				<canvas id='game-canvas' style='position:absolute'>
 					<img src='bank.png'/>

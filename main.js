@@ -1,4 +1,4 @@
-import {getIDs, DOM, removeFromParent, hide, show, hidden, preload} from '/js/util.js';
+import {getIDs, DOM, removeFromParent, arrayClone, hide, show, hidden, toggleHidden, assertExists, preload} from '/js/util.js';
 import {box2} from '/js/vec.js';
 import {ButtonSys} from './buttons.js';
 
@@ -14,8 +14,9 @@ function goodisfinite(x) {
 		x !== -Infinity;
 }
 
+//TODO just use class=page?
 function hideAllPages() {
-	document.querySelectorAll('[data-role="page"]').forEach(page => {
+	document.querySelectorAll('[class="page"]').forEach(page => {
 		hide(page);
 	});
 }
@@ -678,6 +679,10 @@ class PushableObj extends MovableObj {
 class Cloud extends BaseObj {
 	constructor(args) {
 		super();	
+		this.isBlocking = false;
+		this.isBlockingPushers = false;
+		this.blocksExplosion = false;
+		this.blend = 'alpha-threshold';
 		this.vel = args.vel;
 		this.life = args.life;
 		this.scale = [args.scale, args.scale],
@@ -702,19 +707,17 @@ class Cloud extends BaseObj {
 		}
 	}
 }
-Cloud.prototype.isBlocking = false;
-Cloud.prototype.isBlockingPushers = false;
-Cloud.prototype.blocksExplosion = false;
-Cloud.prototype.blend = 'alpha-threshold';
-	
 
 class Particle extends BaseObj {
 	constructor(args) {
 		super();
+		this.isBlocking = false;
+		this.isBlockingPushers = false;
+		this.blocksExplosion = false;
 		this.vel = args.vel;
 		this.life = args.life;	//in seconds
-		this.color = args.color !== undefined ? args.color.clone() : [1,1,1,1];
-		this.srccolor = this.color.clone();
+		this.color = args.color !== undefined ? arrayClone(args.color) : [1,1,1,1];
+		this.srccolor = arrayClone(this.color);
 		this.scale = [args.radius * 2, args.radius * 2];
 		this.setPos(args.pos[0], args.pos[1]);
 		this.startTime = game.time;
@@ -737,9 +740,6 @@ class Particle extends BaseObj {
 		}
 	}
 }
-Particle.prototype.isBlocking = false;
-Particle.prototype.isBlockingPushers = false;
-Particle.prototype.blocksExplosion = false;
 
 class Bomb extends PushableObj {
 	//I wonder if setting 'isBlockingPushers' to 'true' would make it so the player could push multiple blocks?
@@ -748,25 +748,12 @@ class Bomb extends PushableObj {
 	constructor(owner) {
 		super();
 		
-		this.boomTime = 0;
-		this.blastRadius = 1;
-		this.explodingDone = 0;
-		this.sinkDone = 0;
-		this.throwDone = 0;
-
 		this.owner = undefined;
 		this.ownerStandingOn = false;
 
 		this.holder = undefined;
 
 		this.state = this.STATE_IDLE;
-
-		this.fuseDuration = 5;
-		this.chainDuration = .2;
-		this.explodingDuration = .2;
-		this.sinkDuration = 5;
-		this.throwDuration = 1;
-
 
 		this.owner = owner;
 		if (owner !== undefined) this.ownerStandingOn = true;
@@ -837,7 +824,7 @@ class Bomb extends PushableObj {
 	//bombs can only pass thru empty and water
 	cannotPassThru(maptype) {
 		//if it doesn't blocks movement then we're good
-		let res = super.cannotPassThru(maptype);
+		const res = super.cannotPassThru(maptype);
 		if (!res) return false;
 
 		//if the maptype doesn't float objects then it will block the bomb
@@ -847,9 +834,6 @@ class Bomb extends PushableObj {
 	}
 
 	drawSprite(c, rect) {
-		let x = this.posX;
-		let y = this.posY;
-
 		//hack: push & pop position between draw cmd
 		//the other way: new method for underlying drawing of sprite that gets passed x,y
 		if (this.holder !== undefined) {
@@ -878,6 +862,7 @@ class Bomb extends PushableObj {
 	}
 
 	update(dt) {
+		const thiz = this;
 		super.update(dt);
 
 		if (this.holder !== undefined) {
@@ -929,15 +914,15 @@ class Bomb extends PushableObj {
 		if (this.state == this.STATE_IDLE || this.state == this.STATE_LIVE) {
 			//TODO - will this get skipped if it gets pushed immediately after it stopped moving across the last tile?
 			if (!this.moveFracMoving) {	//not moving at the moment
-				let typeUL = game.getMapTypeIndex(this.destPosX - .25, this.destPosY - .25);
-				let typeUR = game.getMapTypeIndex(this.destPosX + .25, this.destPosY - .25);
-				let typeLL = game.getMapTypeIndex(this.destPosX - .25, this.destPosY + .25);
-				let typeLR = game.getMapTypeIndex(this.destPosX + .25, this.destPosY + .25);
+				const typeUL = game.getMapTypeIndex(this.destPosX - .25, this.destPosY - .25);
+				const typeUR = game.getMapTypeIndex(this.destPosX + .25, this.destPosY - .25);
+				const typeLL = game.getMapTypeIndex(this.destPosX - .25, this.destPosY + .25);
+				const typeLR = game.getMapTypeIndex(this.destPosX + .25, this.destPosY + .25);
 
-				let thiz = this;
 				game.objs.forEach(o => {
-					if (o.removeMe) return;
-					if (o instanceof Bomb && o.state == o.STATE_SINKING) {
+					if (!o.removeMe &&
+						o instanceof Bomb && o.state == o.STATE_SINKING
+					) {
 						if (typeUL == game.MAPTYPE_WATER && thiz.linfDist(o.destPosX, o.destPosY, thiz.destPosX - .25, thiz.destPosY - .25) < .5) typeUL = game.MAPTYPE_EMPTY;
 						if (typeUR == game.MAPTYPE_WATER && thiz.linfDist(o.destPosX, o.destPosY, thiz.destPosX + .25, thiz.destPosY - .25) < .5) typeUR = game.MAPTYPE_EMPTY;
 						if (typeLL == game.MAPTYPE_WATER && thiz.linfDist(o.destPosX, o.destPosY, thiz.destPosX - .25, thiz.destPosY + .25) < .5) typeLL = game.MAPTYPE_EMPTY;
@@ -961,19 +946,19 @@ class Bomb extends PushableObj {
 
 		//if state is idle...
 		if (this.state == this.STATE_LIVE) {
-			let t = game.time - this.boomTime;
-			let s = Math.cos(2*t*Math.PI)*.2+.9;
+			const t = game.time - this.boomTime;
+			const s = Math.cos(2*t*Math.PI)*.2+.9;
 			this.scale = [s,s];
 			if (t >= 0) {
 				this.explode();
 			}
 		} else if (this.state == this.STATE_EXPLODING) {
-			let t = game.time - this.explodingDone;
+			const t = game.time - this.explodingDone;
 			if (t >= 0) {
 				game.removeObj(this);
 			}
 		} else if (this.state == this.STATE_SINKING) {
-			let t = game.time - this.sinkDone;
+			const t = game.time - this.sinkDone;
 			if (t >= 0) {
 
 				//remove first so it doesn't influence the checks for sunk bombs
@@ -981,21 +966,21 @@ class Bomb extends PushableObj {
 
 				//then we're sunk
 				//check for anything standing on us ... and kill it
-				let thiz = this;
 				game.objs.forEach(o => {
-					if (o.removeMe) return;
-					//if this object is .25 tile on the sunk bomb...
-					if (thiz.linfDist(o.destPosX, o.destPosY, thiz.destPosX, thiz.destPosY) < .75) {
-
+					if (!o.removeMe && 
+						//if this object is .25 tile on the sunk bomb...
+						thiz.linfDist(o.destPosX, o.destPosY, thiz.destPosX, thiz.destPosY) < .75
+					) {
 						//now check all the types under this object
-						let typeUL = game.getMapTypeIndex(o.destPosX - .25, o.destPosY - .25);
-						let typeUR = game.getMapTypeIndex(o.destPosX + .25, o.destPosY - .25);
-						let typeLL = game.getMapTypeIndex(o.destPosX - .25, o.destPosY + .25);
-						let typeLR = game.getMapTypeIndex(o.destPosX + .25, o.destPosY + .25);
+						const typeUL = game.getMapTypeIndex(o.destPosX - .25, o.destPosY - .25);
+						const typeUR = game.getMapTypeIndex(o.destPosX + .25, o.destPosY - .25);
+						const typeLL = game.getMapTypeIndex(o.destPosX - .25, o.destPosY + .25);
+						const typeLR = game.getMapTypeIndex(o.destPosX + .25, o.destPosY + .25);
 
 						game.objs.forEach(o2 => {
-							if (o2.removeMe) return;
-							if (o2 instanceof Bomb && o2.state == o2.STATE_SINKING) {
+							if (!o2.removeMe && 
+								o2 instanceof Bomb && o2.state == o2.STATE_SINKING
+							) {
 								if (typeUL == Game.MAPTYPE_WATER && thiz.linfDist(o2.destPosX, o2.destPosY, o.destPosX - .25, o.destPosY - .25) < .5) typeUL = game.MAPTYPE_EMPTY;
 								if (typeUR == Game.MAPTYPE_WATER && thiz.linfDist(o2.destPosX, o2.destPosY, o.destPosX + .25, o.destPosY - .25) < .5) typeUR = game.MAPTYPE_EMPTY;
 								if (typeLL == Game.MAPTYPE_WATER && thiz.linfDist(o2.destPosX, o2.destPosY, o.destPosX - .25, o.destPosY + .25) < .5) typeLL = game.MAPTYPE_EMPTY;
@@ -1028,9 +1013,8 @@ class Bomb extends PushableObj {
 	}
 
 	explode() {
-
 		for (let i = 0; i < 10; ++i) {
-			let scale = Math.random() * 2;
+			const scale = Math.random() * 2;
 			game.addObj(new Cloud({
 				pos : [this.posX, this.posY],
 				vel : [Math.random()*2-1, Math.random()*2-1],
@@ -1062,22 +1046,20 @@ class Bomb extends PushableObj {
 				let hit = false;
 				let thiz = this;
 				game.objs.forEach(o => {
-					if (o.removeMe) return;
-					if (o == thiz) return;
-
-					let dist = thiz.linfDist(o.destPosX, o.destPosY, checkPosX, checkPosY);
-
-					//if a flame is even half a block off from an obj then it won't be hit
-					//...except for the player
-					//TODO - class-based let?
-					if (o instanceof Player) {
-						if (dist > .75) return;
-					} else {
-						if (dist > .25) return;
+					if (!o.removeMe &&
+						o != thiz
+					) {
+						const dist = thiz.linfDist(o.destPosX, o.destPosY, checkPosX, checkPosY);
+						//if a flame is even half a block off from an obj then it won't be hit
+						//...except for the player
+						//TODO - class-based let?
+						if (o instanceof Player && dist > .75) {
+						} else if (dist > .25) {
+						} else {
+							o.onTouchFlames();
+							if (o.blocksExplosion) hit = true;
+						}
 					}
-
-					o.onTouchFlames();
-					if (o.blocksExplosion) hit = true;
 				});
 
 				//TODO - make spark temp ents
@@ -1096,9 +1078,9 @@ class Bomb extends PushableObj {
 				let wallStopped = false;
 				for (let ofx = 0; ofx < 2; ofx++) {
 					for (let ofy = 0; ofy < 2; ofy++) {
-						let cfx = Math.floor(checkPosX + ofx * .5 - .25);
-						let cfy = Math.floor(checkPosY + ofy * .5 - .25);
-						let mapType = game.getMapType(cfx, cfy);
+						const cfx = Math.floor(checkPosX + ofx * .5 - .25);
+						const cfy = Math.floor(checkPosY + ofy * .5 - .25);
+						const mapType = game.getMapType(cfx, cfy);
 						if ((mapType.flags & mapType.BLOCKS_EXPLOSIONS) != 0) {
 							//if it's half a block off then it can still be stopped
 							//but it can't clear a wall
@@ -1107,7 +1089,7 @@ class Bomb extends PushableObj {
 								(mapType.flags & mapType.BOMBABLE) != 0)	//only turn bricks into empty
 							{
 								//make some particles
-								let divs = 1;
+								const divs = 1;
 								for (let u = 0; u < divs; ++u) {
 									for (let v = 0; v < divs; ++v) {
 										let speed = 0;
@@ -1151,6 +1133,18 @@ class Bomb extends PushableObj {
 		}
 	}
 }
+Bomb.prototype.boomTime = 0;
+Bomb.prototype.blastRadius = 1;
+Bomb.prototype.explodingDone = 0;
+Bomb.prototype.sinkDone = 0;
+Bomb.prototype.throwDone = 0;
+
+Bomb.prototype.fuseDuration = 5;
+Bomb.prototype.chainDuration = .2;
+Bomb.prototype.explodingDuration = .2;
+Bomb.prototype.sinkDuration = 5;
+Bomb.prototype.throwDuration = 1;
+
 Bomb.prototype.STATE_IDLE = 0;
 Bomb.prototype.STATE_LIVE = 1;
 Bomb.prototype.STATE_EXPLODING = 2;
@@ -1474,7 +1468,7 @@ class Player extends MovableObj {
 
 	setBombs(bombs) {
 		this.bombs = bombs;
-		ids['game-hud-bombs'].innerText = this.bombs;
+		ids.game_hud_bombs.innerText = this.bombs;
 	}
 }
 
@@ -1662,7 +1656,7 @@ class Game {
 
 	//static
 	gamepadToggle() {
-		if (ids['gamepad-checkbox'].checked) {
+		if (ids.gamepad_checkbox.checked) {
 			buttonSys.show();
 		} else {
 			buttonSys.hide();
@@ -1738,13 +1732,13 @@ class Game {
 	}
 
 	setLevel(level) {
-console.log('setLevel', level);		
+//console.log('setLevel', level);		
 		this.level = level;
 		if (this.level != -1) {
 			localStorage.setItem('level', this.level);
-			ids['game-hud-level'].innerText=this.level;
+			ids.game_hud_level.innerText = this.level;
 		} else {
-			ids['game-hud-level'].innerText='?';
+			ids.game_hud_level.innerText = '?';
 		}
 	}
 
@@ -1755,7 +1749,7 @@ console.log('setLevel', level);
 		{
 			let levelData = undefined;
 			if (this.level !== -1) {
-console.log('this.level', this.level, levelDB[this.level]);				
+//console.log('this.level', this.level, levelDB[this.level]);				
 				levelData = levelDB[this.level].tiles;
 			} else if (this.levelData !== undefined) {
 				levelData = this.levelData;
@@ -2744,8 +2738,7 @@ preload(imgs, () => {
 	*/
 
 	//if get params have a level, then just play it
-	let level = urlparams.get('level');
-console.log('setting level', level);	
+	const level = urlparams.get('level');
 	if (goodisfinite(level)) {
 		splash.start({level:parseInt(level)});
 	} else {
@@ -2756,11 +2749,30 @@ console.log('setting level', level);
 	ids.loading.value = parseInt(100*percent);
 });
 
-ids.startButton.addEventListener('click', e => { splash.start(); });
-ids.chooseLevelsButton.addEventListener('click', e => { chooseLevels.show(); });
-ids.helpButton.addEventListener('click', e => { showHelp(); });
-ids.levelPageMainMenuButton.addEventListener('click', e => { splash.show(); });
-ids.helpPageMainMenuButton.addEventListener('click', e => { Game.prototype.close(); });
-ids.helpPageMainMenuButton2.addEventListener('click', e => { Game.prototype.close(); });
+Object.entries({
+	startButton : {click : e => { splash.start(); }},
+	chooseLevelsButton : {click : e => { chooseLevels.show(); }},
+	helpButton : {click : e => { showHelp(); }},
+	levelPageMainMenuButton : {click : e => { splash.show(); }},
+	helpPageMainMenuButton : {click : e => { Game.prototype.close(); }},
+	helpPageMainMenuButton2 : {click : e => { Game.prototype.close(); }},
+	editorPageClose : {click : e => { splash.show(); }},
+	editorPagePlay : {click : e => { editor.play(); }},
+	editorPageSave : {click : e => { editor.save(); }},
+	editorPageSubmit : {click : e => { editor.submit(); }},
+	gamePageMenu : {click : e => { toggleHidden(ids.dropdown); }},
+	gamePageSkip : {click : e => { Game.prototype.skip(); }},
+	gamePageRestart : {click : e => { Game.prototype.restart(); }},
+	gamepad_checkbox : {change : e => { Game.prototype.gamepadToggle(); }},
+	gamePageEdit : {click : e => { editor.edit(); }},
+	gamePageClose : {click : e => { Game.prototype.close(); }},
+}).forEach(entry => {
+	const [id, handlers] = entry;
+	const obj = assertExists(ids, id);
+	Object.entries(handlers).forEach(entry => {
+		const [name, func] = entry;
+		obj.addEventListener(name, func);
+	});
+});
 
 update();
