@@ -2142,7 +2142,7 @@ Game.prototype.MAPTYPE_OOB = Game.prototype.MAPTYPE_STONE;
 function refreshLevels(done) {
 	fetch('levels.json')
 	.then(response => {
-		if (!response.ok) throw 'not ok';
+		if (!response.ok) return Promise.reject('not ok');
 		response.json()
 		.then(d => {
 			levelDB = d.levels;
@@ -2164,7 +2164,7 @@ function refreshUserLevels(done) {
 
 	fetch('userlevels.json')
 	.then(response => {
-		if (!response.ok) throw 'not ok';
+		if (!response.ok) return Promise.reject('not ok');
 		response.json()
 		.then(d => {
 			allUsersLevelDB = d.levels;
