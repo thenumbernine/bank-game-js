@@ -1,8 +1,44 @@
-.page {
-	text-align:center;
-	background-size:100% 100%;
-	background:black;
-	color:white;
-	text-shadow:0 1px 0 black;
+html {
+	user-select : none;
+	margin : 0;
+	padding : 0;
+	width : 100%;
+	height : 100%;
 }
 
+body {
+	user-select : none;
+	margin : 0;
+	padding : 0;
+	width : 100%;
+	height : 100%;
+	background-color : black;
+}
+
+.page {
+	text-align : center;
+	background-size : 100% 100%;
+	background-color : black;
+	color : white;
+	text-shadow : 0 1px 0 black;
+	display : none;
+	width : 100%;
+	height : 100%;
+	min-height : 100%;
+	overflow : auto;
+}
+
+button, label {
+	background-color : white;
+	color : black;
+	padding : 10px;
+	border-radius : 10px;
+	font-size : 14pt;
+	font-weight : 600;
+	cursor : pointer;
+}
+
+#game_page {
+	font-size : 24pt;
+	font-weight : 600;
+}

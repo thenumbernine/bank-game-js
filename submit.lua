@@ -21,13 +21,13 @@ return {
 			tiles = tiles:gsub('[\r\n]', '')
 			local fn = 'userlevels.json'
 			local leveldb
-			local srcdata = io.readfile(fn)
+			local srcdata = file(fn):read()
 			if srcdata then
 				leveldb = json.decode(srcdata)
 			end
 			leveldb = leveldb or {levels={}}
 			table.insert(leveldb.levels, {name=name, tiles=tiles})
-			file[fn] = json.encode(leveldb, {indent=true})
+			file(fn):write(json.encode(leveldb, {indent=true}))
 			text = function() coroutine.yield(json.encode{result='win'}) end
 		else
 			text = function() coroutine.yield(json.encode{

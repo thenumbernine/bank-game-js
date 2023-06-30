@@ -1,20 +1,52 @@
-var canvas, glutil, gl;
+import {getIDs, DOM, removeFromParent, arrayClone, hide, show, hidden, toggleHidden, assertExists, preload} from '/js/util.js';
+import {box2} from '/js/vec.js';
+import {ButtonSys} from './buttons.js';
 
-function Rect() {
-	this.left = 0;
-	this.right = 0;
-	this.top = 0;
-	this.bottom = 0;
+const ids = getIDs();
+window.ids = ids;
+
+const urlparams = new URLSearchParams(window.location.search);
+
+function goodisfinite(x) {
+	return typeof(x) == 'number' &&
+		!isNaN(x) &&
+		x !== Infinity &&
+		x !== -Infinity;
 }
 
-var Dir = {
+//TODO just use class=page?
+function hideAllPages() {
+	document.querySelectorAll('[class="page"]').forEach(page => {
+		hide(page);
+	});
+}
+
+let activePage;
+function changePage(id) {
+	hideAllPages();
+	activePage = ids[id];
+	show(ids[id]);
+}
+
+let canvas, glutil, gl;
+
+class Rect {
+	constructor() {
+		this.left = 0;
+		this.right = 0;
+		this.top = 0;
+		this.bottom = 0;
+	}
+}
+
+const Dir = {
 	NONE : -1,
 	UP : 0,
 	DOWN : 1,
 	LEFT : 2,
 	RIGHT : 3,
 	COUNT : 4,
-	
+
 	vec : [
 		[0,-1],
 		[0,1],
@@ -23,102 +55,99 @@ var Dir = {
 	]
 };
 
-var MapType = makeClass({
-	CANNOT_PASSTHRU : 1,	//blocks any moving thing
-	DRAW_GROUND_UNDER : 2,	//special for trees and other semi-transparent ones
-	BLOCKS_GUNSHOT : 4,	//blocks shots from guns
-	BLOCKS_EXPLOSIONS : 8,	//explosions stop here.  then they check BOMBABLE and clear the tile if it's bombable
-	BOMBABLE : 16,			//bomb this type of block to return it to empty
-
-	bitmapId : 0,
-	typeIndex : 0,
-	flags : 0,
-	
-	init : function(bitmapId, flags) {
+class MapType {
+	constructor(bitmapId, flags) {
 		this.bitmapId = bitmapId;
+		if (this.bitmapId === undefined) this.bitmapId = 0;
 		this.flags = flags;
+		if (this.flags === undefined) this.flags = 0;
+		this.typeIndex = 0;
 	}
-});
+}
+MapType.prototype.CANNOT_PASSTHRU = 1;	//blocks any moving thing
+MapType.prototype.DRAW_GROUND_UNDER = 2;	//special for trees and other semi-transparent ones
+MapType.prototype.BLOCKS_GUNSHOT = 4;	//blocks shots from guns
+MapType.prototype.BLOCKS_EXPLOSIONS = 8;	//explosions stop here.  then they check BOMBABLE and clear the tile if it's bombable
+MapType.prototype.BOMBABLE = 16;			//bomb this type of block to return it to empty
 
-var Frame = makeClass({
-	bitmapId : 0,
-	duration : 1,	//in frames
-	frameChange : 0,
-	sequenceMarker : -1,
 
-	init : function(bitmapId, duration, frameChange, sequenceMarker) {
+class Frame {
+	constructor(bitmapId, duration, frameChange, sequenceMarker) {
 		this.bitmapId = bitmapId;
-		this.duration = duration !== undefined ? duration : 1;
+		if (this.bitmapId === undefined) this.bitmapId = 0;
+		this.duration = duration !== undefined ? duration : 1;	//in frames
 		this.frameChange = frameChange !== undefined ? frameChange : 0;
 		this.sequenceMarker = sequenceMarker !== undefined ? sequenceMarker : 0;
 	}
-});
-	
-var Animation = makeClass({
+}
 
-	SEQ_PLAYER_STAND_UP : 0,
-	SEQ_PLAYER_STAND_DOWN : 1,
-	SEQ_PLAYER_STAND_LEFT : 2,
-	SEQ_PLAYER_STAND_RIGHT : 3,
-	SEQ_PLAYER_WALK_UP : 4,
-	SEQ_PLAYER_WALK_DOWN : 5,
-	SEQ_PLAYER_WALK_LEFT : 6,
-	SEQ_PLAYER_WALK_RIGHT : 7,
-	SEQ_PLAYER_DEAD : 17,
-	
-	SEQ_MONEY : 8,
-	SEQ_KEY : 9,
-	SEQ_KEY_GREY : 10,
-	SEQ_DOOR : 11,
-	SEQ_SPARK : 13,
-	SEQ_FRAMER : 14,
-		
-	SEQ_BOMB : 12,
-	SEQ_BOMB_LIT : 18,
-	SEQ_BOMB_SUNK : 19,
-
-	SEQ_GUN : 15,
-	SEQ_GUN_MAD : 16,
-	
-	SEQ_SENTRY : 20,
-	
-	SEQ_GLOVE : 21,
-	
-	SEQ_CLOUD: 22,
-	
-	SEQ_BRICKS : 23,
-	
-	SEQ_COUNT : 24, 	
-
-	init : function() {
-		for (var i = 0; i < this.framesForSeq.length; i++) {
+class Animation {
+	constructor() {
+		for (let i = 0; i < this.framesForSeq.length; i++) {
 			this.framesForSeq[i] = -1;
-			for (var j = 0; j < this.frames.length; j++) {
+			for (let j = 0; j < this.frames.length; j++) {
 				if (this.frames[j].sequenceMarker == i) {
-					this.framesForSeq[i] = j;	
+					this.framesForSeq[i] = j;
 					break;
 				}
 			}
 		}
-		
-		for (var i = 0; i < this.frames.length; i++) {
-			var frame = this.frames[i];
-			frame.bitmap = $('<img>', {src:'res/drawable/'+frame.bitmapId+'.png'}).get(0);
+
+		for (let i = 0; i < this.frames.length; i++) {
+			let frame = this.frames[i];
+			frame.bitmap = DOM('img', {src:'res/drawable/'+frame.bitmapId+'.png'});
 		}
-	},
-	
-	getFrameForSeq : function(seq) {
+	}
+
+	getFrameForSeq(seq) {
 		if (seq < 0 || seq >= this.framesForSeq.length) return -1;
 		return this.framesForSeq[seq];
 	}
-});
+}
+
+
+Animation.prototype.SEQ_PLAYER_STAND_UP = 0;
+Animation.prototype.SEQ_PLAYER_STAND_DOWN = 1;
+Animation.prototype.SEQ_PLAYER_STAND_LEFT = 2;
+Animation.prototype.SEQ_PLAYER_STAND_RIGHT = 3;
+Animation.prototype.SEQ_PLAYER_WALK_UP = 4;
+Animation.prototype.SEQ_PLAYER_WALK_DOWN = 5;
+Animation.prototype.SEQ_PLAYER_WALK_LEFT = 6;
+Animation.prototype.SEQ_PLAYER_WALK_RIGHT = 7;
+Animation.prototype.SEQ_PLAYER_DEAD = 17;
+
+Animation.prototype.SEQ_MONEY = 8;
+Animation.prototype.SEQ_KEY = 9;
+Animation.prototype.SEQ_KEY_GREY = 10;
+Animation.prototype.SEQ_DOOR = 11;
+Animation.prototype.SEQ_SPARK = 13;
+Animation.prototype.SEQ_FRAMER = 14;
+
+Animation.prototype.SEQ_BOMB = 12;
+Animation.prototype.SEQ_BOMB_LIT = 18;
+Animation.prototype.SEQ_BOMB_SUNK = 19;
+
+Animation.prototype.SEQ_GUN = 15;
+Animation.prototype.SEQ_GUN_MAD = 16;
+
+Animation.prototype.SEQ_SENTRY = 20;
+
+Animation.prototype.SEQ_GLOVE = 21;
+
+Animation.prototype.SEQ_CLOUD = 22;
+
+Animation.prototype.SEQ_BRICKS = 23;
+
+Animation.prototype.SEQ_COUNT = 24;
+
+
 //needs other statics to define itself
 Animation.prototype.framesForSeq = [];
 Animation.prototype.framesForSeq.length = Animation.prototype.SEQ_COUNT;
-	
+
 Animation.prototype.frames = [
 	//Frame init : function(bitmapId, duration, frameChange, sequenceMarker)
-	//player 
+	//player
 		//stand up
 	new Frame('teeth_up', 1, 0, Animation.prototype.SEQ_PLAYER_STAND_UP),
 		//stand down
@@ -127,7 +156,7 @@ Animation.prototype.frames = [
 	new Frame('teeth_left', 1, 0, Animation.prototype.SEQ_PLAYER_STAND_LEFT),
 		//stand right
 	new Frame('teeth_right', 1, 0, Animation.prototype.SEQ_PLAYER_STAND_RIGHT),
-	
+
 		//walk up
 	new Frame('teeth_up', 3, 1, Animation.prototype.SEQ_PLAYER_WALK_UP),
 	new Frame('teeth_up_step', 3, -1),
@@ -140,81 +169,81 @@ Animation.prototype.frames = [
 		//walk right
 	new Frame('teeth_right', 3, 1, Animation.prototype.SEQ_PLAYER_WALK_RIGHT),
 	new Frame('teeth_right_step', 3, -1),
-	
+
 	new Frame('teeth_dead', 1, 0, Animation.prototype.SEQ_PLAYER_DEAD),
-	
+
 	//money
 	new Frame('money', 1, 0, Animation.prototype.SEQ_MONEY),
-	
+
 	//key
 	new Frame('key', 1, 0, Animation.prototype.SEQ_KEY),
 
 	//key grey
 	new Frame('key_grey', 1, 0, Animation.prototype.SEQ_KEY_GREY),
-	
+
 	//door
 	new Frame('door', 1, 0, Animation.prototype.SEQ_DOOR),
-	
+
 	//bomb
 	new Frame('bomb', 1, 0, Animation.prototype.SEQ_BOMB),
 	new Frame('bomb_lit', 1, 1, Animation.prototype.SEQ_BOMB_LIT),
 	new Frame('bomb', 1, -1, Animation.prototype.SEQ_BOMB_LIT),
 	new Frame('bomb_sunk', 1, 0, Animation.prototype.SEQ_BOMB_SUNK),
-	
+
 	//spark
 	new Frame('flame', 1, 0, Animation.prototype.SEQ_SPARK),
-	
+
 	//framer
 	new Frame('framer', 1, 0, Animation.prototype.SEQ_FRAMER),
-	
+
 	//gun
 	new Frame('medusa', 1, 0, Animation.prototype.SEQ_GUN),
 	new Frame('medusa_pissed', 1, 0, Animation.prototype.SEQ_GUN_MAD),
-	
+
 	//sentry
 	new Frame('sentry1', 3, 1, Animation.prototype.SEQ_SENTRY),
 	new Frame('sentry2', 3, -1),
-	
+
 	//glove
 	new Frame('gloves', 1, 0, Animation.prototype.SEQ_GLOVE),
-	
+
 	new Frame('cloud', 1, 0, Animation.prototype.SEQ_CLOUD),
-	
+
 	new Frame('bricks', 1, 0, Animation.prototype.SEQ_BRICKS)
 ];
 
-var GameNumbers = makeClass(new (function(){
-	this.bitmaps = [];
-	this.staticInit = function() {
-		for (var i = 0; i < 10; i++) {
-			GameNumbers.prototype.bitmaps.push($('<img>', {src:'res/drawable/'+i+'.png'}).get(0));
+class GameNumbers {
+	static staticInit() {
+		for (let i = 0; i < 10; i++) {
+			GameNumbers.prototype.bitmaps.push(DOM('img', {src:'res/drawable/'+i+'.png'}));
 		}
-	};
-	this.draw = function(c, rect, n, x, y) {
-		var paddingX = game.canvas.width - game.MAP_WIDTH * game.TILE_WIDTH;
-		var s = ''+n;
-		for (var i = 0; i < s.length; i++) {
-			var frame = s.charCodeAt(i) - ('0').charCodeAt(0);
-			var bitmap = this.bitmaps[frame];
+	}
+	draw(c, rect, n, x, y) {
+		let paddingX = game.canvas.width - game.MAP_WIDTH * game.TILE_WIDTH;
+		let s = ''+n;
+		for (let i = 0; i < s.length; i++) {
+			let frame = s.charCodeAt(i) - ('0').charCodeAt(0);
+			let bitmap = this.bitmaps[frame];
 			if (!bitmap) continue;
-			
+
 			rect.left = (x + i - .25) * game.TILE_WIDTH + paddingX;
 			rect.right = rect.left + game.TILE_WIDTH/2;
 			rect.top = (y - .25) * game.TILE_HEIGHT;
 			rect.bottom = rect.top + game.TILE_HEIGHT/2;
 
 			try {
-				c.drawImage(bitmap, 
+				c.drawImage(bitmap,
 					rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top
 				);
 			} catch (e) {}
 		}
-	};
-})());
+	}
+}
+GameNumbers.prototype.bitmaps = [];
 
 /*
 function GameText() {
-	this.span = $('<span>', {
+	this.span = DOM('span', {
 		css:{
 			position:'absolute',
 			zIndex:1
@@ -225,8 +254,8 @@ function GameText() {
 }
 GameText.prototype = {
 	draw : function(c, text, posX, posY) {
-		var paddingX = game.canvas.width - game.MAP_WIDTH * game.TILE_WIDTH;
-		var canvasPos = $(game.canvas).position();
+		let paddingX = game.canvas.width - game.MAP_WIDTH * game.TILE_WIDTH;
+		let canvasPos = [game.canvas.offsetLeft, game.canvas.offsetTop];
 		this.span.get(0).style.fontSize = parseInt(game.TILE_HEIGHT/2)+'px';
 		this.span.get(0).style.left = parseInt(canvasPos.left + ((posX - .25) * game.TILE_WIDTH) + paddingX);
 		this.span.get(0).style.top = parseInt(canvasPos.top + ((posY + .25) * game.TILE_HEIGHT) - game.TILE_HEIGHT/2);
@@ -236,120 +265,124 @@ GameText.prototype = {
 };
 */
 
-var AnimatedObj = makeClass(new (function(){
+class AnimatedObj {
+	constructor() {
+		this.scale = [1,1];
 
-	this.scale = [1,1];
+		this.frameId = 0;	//index into frametable
+		this.frameTime = 0;	//measured in fps intervals, i.e. frames
 
-	this.frameId = 0;	//index into frametable
-	this.frameTime = 0;	//measured in fps intervals, i.e. frames
+		this.framerate = 30;	//animation framerate
 
-	this.framerate = 30;	//animation framerate
+		this.seq = -1;
+	}
 
-	this.seq = -1;
-	
-	this.update = function(dt) {
+	update(dt) {
 		if (this.frameId < 0 || this.frameId >= anim.frames.length) return;
-		var frame = anim.frames[this.frameId];
+		let frame = anim.frames[this.frameId];
 		this.frameTime += dt * this.framerate;
 		if (this.frameTime < frame.duration) return;
 		this.setFrame(this.frameId + frame.frameChange);
-	};
-	
-	this.setFrame = function(frameId) {
+	}
+
+	setFrame(frameId) {
 		this.frameId = frameId;
 		this.frameTime = 0;
-	};
-	
-	this.setSeq = function(seq) {
+	}
+
+	setSeq(seq) {
 		if (this.seq == seq) return;
-		
+
 		this.seq = seq;
 		this.setFrame( anim.getFrameForSeq(seq) );
-	};
-})());
+	}
+}
 
-var cachedAlphaThresholdResolution = 255;
-var cachedAlphaThresholdImages = {};
-var BaseObj = makeClass(new (function(){
-	this.super = AnimatedObj;
+let cachedAlphaThresholdResolution = 255;
+let cachedAlphaThresholdImages = {};
 
-	this.removeMe = false;
+class BaseObj extends AnimatedObj {
+	constructor() {
+		super();
 
-	this.HIT_RESPONSE_STOP = 0;
-	this.HIT_RESPONSE_MOVE_THRU = 1;
-	this.HIT_RESPONSE_TEST_OBJECT = 2;
-	
-	this.posX = 0;
-	this.posY = 0;
-	this.startPosX = 0;
-	this.startPosY = 0;
-	this.srcPosX = 0;
-	this.srcPosY = 0;
-	this.destPosX = 0;
-	this.destPosY = 0;
-	
-	this.moveCmd = -1;
-	
-	this.isBlocking = true;
-	this.isBlockingPushers = true;
-	this.blocksExplosion = true;
-		
-	this.blend = 'source-over';
+		this.removeMe = false;
+
+		this.HIT_RESPONSE_STOP = 0;
+		this.HIT_RESPONSE_MOVE_THRU = 1;
+		this.HIT_RESPONSE_TEST_OBJECT = 2;
+
+		this.posX = 0;
+		this.posY = 0;
+		this.startPosX = 0;
+		this.startPosY = 0;
+		this.srcPosX = 0;
+		this.srcPosY = 0;
+		this.destPosX = 0;
+		this.destPosY = 0;
+
+		this.moveCmd = -1;
+
+		this.isBlocking = true;
+		this.isBlockingPushers = true;
+		this.blocksExplosion = true;
+
+		this.blend = 'source-over';
+	}
 
 	//helpful for subclasses.  TODO - move somewhere else
-	this.linfDist = function(ax, ay, bx, by) {
-		var dx = ax - bx;
-		var dy = ay - by;
-		var adx = dx < 0 ? -dx : dx;
-		var ady = dy < 0 ? -dy : dy;
+	linfDist(ax, ay, bx, by) {
+		let dx = ax - bx;
+		let dy = ay - by;
+		let adx = dx < 0 ? -dx : dx;
+		let ady = dy < 0 ? -dy : dy;
 		return adx > ady ? adx : ady;	//maximum of the two
-	};
-	
-	this.setPos = function(x, y) {
+	}
+
+	setPos(x, y) {
 		this.srcPosX = this.destPosX = x;
 		this.srcPosY = this.destPosY = y;
 		//the lua game didnt' do this..
 		this.posX = x;
 		this.posY = y;
-	};
-	
-	this.drawSprite = function(c, rect) {
+	}
+
+	drawSprite(c, rect) {
 		if (this.frameId < 0 || this.frameId >= anim.frames.length) return;
-		
-		var paddingX = game.canvas.width - game.MAP_WIDTH * game.TILE_WIDTH;
-	
-		var w = game.TILE_WIDTH * this.scale[0];
-		var h = game.TILE_HEIGHT * this.scale[1];
+
+		let paddingX = game.canvas.width - game.MAP_WIDTH * game.TILE_WIDTH;
+
+		let w = game.TILE_WIDTH * this.scale[0];
+		let h = game.TILE_HEIGHT * this.scale[1];
 
 		rect.left = (this.posX - .5 * this.scale[0]) * game.TILE_WIDTH + paddingX;
 		rect.right = rect.left + w;
 		rect.top = (this.posY - .5 * this.scale[1]) * game.TILE_HEIGHT;
 		rect.bottom = rect.top + h;
-		
-		var frame = anim.frames[this.frameId];
+
+		let frame = anim.frames[this.frameId];
 		if (!frame) throw 'failed to find frame for id '+this.frameId;
-		
-		var bitmap = frame.bitmap;
+
+		let bitmap = frame.bitmap;
 		if (!bitmap) throw 'failed to find bitmap for frame '+this.frameId;
-		
-		if (this.blend == 'alpha-threshold') {	
-			var alpha = this.color !== undefined ? this.color[3] : 1;
-		
+
+		if (this.blend == 'alpha-threshold') {
+			let alpha = this.color !== undefined ? this.color[3] : 1;
+
 			if (!cachedAlphaThresholdImages[bitmap.src]) {
 				cachedAlphaThresholdImages[bitmap.src] = [];
 			}
-			var tmpcanvas = cachedAlphaThresholdImages[bitmap.src][Math.floor(alpha * cachedAlphaThresholdResolution)];
+			let tmpcanvas = cachedAlphaThresholdImages[bitmap.src][Math.floor(alpha * cachedAlphaThresholdResolution)];
 			if (!tmpcanvas) {
 				tmpcanvas = document.createElement('canvas');
 				cachedAlphaThresholdImages[bitmap.src][Math.floor(alpha * cachedAlphaThresholdResolution)] = tmpcanvas;
 				tmpcanvas.width = bitmap.width;
 				tmpcanvas.height = bitmap.height;
-				
-				var tmpctx = tmpcanvas.getContext('2d');
+
+				let tmpctx = tmpcanvas.getContext('2d');
 				tmpctx.drawImage(bitmap, 0, 0);
-				var imagedata = tmpctx.getImageData(0, 0, bitmap.width, bitmap.height);
-				var data = imagedata.data;
-				for (var i = 0; i < data.length; i += 4) {
+				let imagedata = tmpctx.getImageData(0, 0, bitmap.width, bitmap.height);
+				let data = imagedata.data;
+				for (let i = 0; i < data.length; i += 4) {
 					data[i+3] = data[i+3] * alpha < 128 ? 0 : 63;
 				}
 				tmpctx.putImageData(imagedata, 0, 0);
@@ -381,90 +414,88 @@ var BaseObj = makeClass(new (function(){
 			c.globalAlpha = 1;
 			c.globalCompositeOperation = 'source-over';
 		}
-	};
-	
+	}
+
 	//whether sentry can walk over it
 	//i know, i know ... how esoteric are these routines in the base class becoming?
 	//currently set to 'isBlocking' except for money, which is always true
 	//this means keys and doors don't block
-	this.isBlockingSentry = function() { return this.isBlocking; };
-	
-	this.hitEdge = function(whereX, whereY) { return true; };
-	
-	this.cannotPassThru = function(maptype) {
-		var res = (game.mapTypes[maptype].flags & MapType.prototype.CANNOT_PASSTHRU) != 0;
+	isBlockingSentry() { return this.isBlocking; }
+
+	hitEdge(whereX, whereY) { return true; }
+
+	cannotPassThru(maptype) {
+		let res = (game.mapTypes[maptype].flags & MapType.prototype.CANNOT_PASSTHRU) != 0;
 		return res;
-	};
-	
-	this.hitWorld = function(whereX, whereY, typeUL, typeUR, typeLL, typeLR) {
-		var res =
+	}
+
+	hitWorld(whereX, whereY, typeUL, typeUR, typeLL, typeLR) {
+		let res =
 			this.cannotPassThru(typeUL) ||
 			this.cannotPassThru(typeUR) ||
 			this.cannotPassThru(typeLL) ||
 			this.cannotPassThru(typeLR);
 		return res;
-	};
-	
+	}
+
 	//called when MovableObj's get a move cmd, try to move, and hit another object
 	//this - the object that is moving
 	//what - the object that was hit
-	this.hitObject = function(what, pushDestX, pushDestY, side) {
+	hitObject(what, pushDestX, pushDestY, side) {
 		return this.HIT_RESPONSE_TEST_OBJECT;
-	};
-	
+	}
+
 	//called when MovableObj's get a move cmd, try to move, hit another object,
 	//	and the MovableObj's hitObject returns HIT_RESPONSE_TEST_OBJECT
 	//this - the object being pushed
 	//pusher - the MovableObj that is pushing it
 	//returns - true if the pusher was blocked by this object
-	this.startPush = function(pusher, pushDestX, pushDestY, side) {
+	startPush(pusher, pushDestX, pushDestY, side) {
 		return this.isBlocking;
-	};
-	
-	this.endPush = function(who, pushDestX, pushDestY) {};
-	
-	this.onKeyTouch = function() {};
-	
-	this.onTouchFlames = function() {};
-	
-	this.onGroundSunk = function() {
+	}
+
+	endPush(who, pushDestX, pushDestY) {}
+
+	onKeyTouch() {}
+
+	onTouchFlames() {}
+
+	onGroundSunk() {
 		game.removeObj(this);
-	};
+	}
 
 	//use game.removeObj to remove an object
-	this.onRemove = function() {
+	onRemove() {
 		this.removeMe = true;
-	};
-})());
+	}
+}
 
-var MovableObj = makeClass(new (function(){
-	this.super = BaseObj;
-	this.MOVE_RESPONSE_NO_MOVE = 0;
-	this.MOVE_RESPONSE_WAS_BLOCKED = 1;
-	this.MOVE_RESPONSE_DID_MOVE = 2;
-	
-	this.lastMoveResponse = this.MOVE_RESPONSE_NO_MOVE;
-	this.moveCmd = Dir.NONE;
-	this.speed = 10;	//tiles covered per second
-	this.moveFracMoving = false;
-	this.moveFrac = 0;	//fixed precision
-	
-	this.moveIsBlocked_CheckHitWorld = function(whereX, whereY) {
-		var typeUL = game.getMapTypeIndex(whereX - .25, whereY - .25);
-		var typeUR = game.getMapTypeIndex(whereX + .25, whereY - .25);
-		var typeLL = game.getMapTypeIndex(whereX - .25, whereY + .25);
-		var typeLR = game.getMapTypeIndex(whereX + .25, whereY + .25);
-		
+class MovableObj extends BaseObj {
+	constructor() {
+		super();
+		this.lastMoveResponse = this.MOVE_RESPONSE_NO_MOVE;
+		this.moveCmd = Dir.NONE;
+		this.speed = 10;	//tiles covered per second
+		this.moveFracMoving = false;
+		this.moveFrac = 0;	//fixed precision
+	}
+
+	moveIsBlocked_CheckHitWorld(whereX, whereY) {
+		let typeUL = game.getMapTypeIndex(whereX - .25, whereY - .25);
+		let typeUR = game.getMapTypeIndex(whereX + .25, whereY - .25);
+		let typeLL = game.getMapTypeIndex(whereX - .25, whereY + .25);
+		let typeLR = game.getMapTypeIndex(whereX + .25, whereY + .25);
+
 		return this.hitWorld(whereX, whereY, typeUL, typeUR, typeLL, typeLR);
-	};
+	}
 
 	//for movable walking atop floating bombs in water
-	this.hitWorld = function(whereX, whereY, typeUL, typeUR, typeLL, typeLR) {
-		var thiz = this;
-		$.each(game.objs, function(_o,o) {
-			if (o.removeMe) return true;	//continue
-			if (o == thiz) return true;	//continue;
-			if (o.isa(Bomb) && o.state == o.STATE_SINKING) {
+	hitWorld(whereX, whereY, typeUL, typeUR, typeLL, typeLR) {
+		let thiz = this;
+		game.objs.forEach(o => {
+			if (o.removeMe) return;
+			if (o == thiz) return;
+			if (o instanceof Bomb && o.state == o.STATE_SINKING) {
 				//if any of our corners are really standing on an egg rather than water then treat it like its empty
 				if (typeUL == Game.prototype.MAPTYPE_WATER && thiz.linfDist(o.destPosX, o.destPosY, whereX - .25, whereY - .25) < (.5)) typeUL = Game.prototype.MAPTYPE_EMPTY;
 				if (typeUR == Game.prototype.MAPTYPE_WATER && thiz.linfDist(o.destPosX, o.destPosY, whereX + .25, whereY - .25) < (.5)) typeUR = Game.prototype.MAPTYPE_EMPTY;
@@ -472,10 +503,10 @@ var MovableObj = makeClass(new (function(){
 				if (typeLR == Game.prototype.MAPTYPE_WATER && thiz.linfDist(o.destPosX, o.destPosY, whereX + .25, whereY + .25) < (.5)) typeLR = Game.prototype.MAPTYPE_EMPTY;
 			}
 		});
-		return MovableObj.superProto.hitWorld.call(this, whereX, whereY, typeUL, typeUR, typeLL, typeLR);
-	};
-	
-	this.moveIsBlocked_CheckEdge = function(newDestX, newDestY) {
+		return super.hitWorld(whereX, whereY, typeUL, typeUR, typeLL, typeLR);
+	}
+
+	moveIsBlocked_CheckEdge(newDestX, newDestY) {
 		if (newDestX < .25 ||
 			newDestY < .25 ||
 			newDestX > game.MAP_WIDTH - .25 ||
@@ -484,124 +515,127 @@ var MovableObj = makeClass(new (function(){
 			return this.hitEdge(newDestX, newDestY);
 		}
 		return false;
-	};
-	
-	this.moveIsBlocked_CheckHitObject = function(o, cmd, newDestX, newDestY) {
+	}
+
+	moveIsBlocked_CheckHitObject(o, cmd, newDestX, newDestY) {
 		//if o's bbox at its destpos touches ours at our destpos then
 		if (this.linfDist(o.destPosX, o.destPosY, newDestX, newDestY) > .75) return false;
-		
-		var response = this.hitObject(o, newDestX, newDestY, cmd);
-		
+
+		let response = this.hitObject(o, newDestX, newDestY, cmd);
+
 		if (response == this.HIT_RESPONSE_STOP) {
 			return true;
 		}
-		
+
 		if (response == this.HIT_RESPONSE_TEST_OBJECT) {
 			if (o.startPush(this, newDestX, newDestY, cmd)) {
 				return true;
 			}
 		}
-		
+
 		return false;
-	};
-	
-	this.moveIsBlocked_CheckHitObjects = function(cmd, newDestX, newDestY) {
+	}
+
+	moveIsBlocked_CheckHitObjects(cmd, newDestX, newDestY) {
 		//then cycle through all entities ...
-		var thiz = this;
-		var return_ = false;
-		$.each(game.objs, function(_o,o) {
-			if (o.removeMe) return true;//continue;
-			if (o == thiz) return true;//continue;
+		let thiz = this;
+		let return_ = false;
+		for (let i = 0; i < game.objs.length; ++i) {
+			const o = game.objs[i];
+			if (o.removeMe) continue;
+			if (o == thiz) continue;
 			if (thiz.moveIsBlocked_CheckHitObject(o, cmd, newDestX, newDestY)) {
 				return_ = true;
-				return false;//break;
+				break;
 			}
-		});
+		}
 		return return_;
-	};
-	
-	this.moveIsBlocked = function(cmd, newDestX, newDestY) {
+	}
+
+	moveIsBlocked(cmd, newDestX, newDestY) {
 		if (this.moveIsBlocked_CheckEdge(newDestX, newDestY)) return true;
 		if (this.moveIsBlocked_CheckHitWorld(newDestX, newDestY)) return true;
-		if (this.moveIsBlocked_CheckHitObjects(cmd, newDestX, newDestY)) return true;		
+		if (this.moveIsBlocked_CheckHitObjects(cmd, newDestX, newDestY)) return true;
 		return false;
-	};
-	
-	this.doMove = function(cmd) {
+	}
+
+	doMove(cmd) {
 		if (cmd == Dir.NONE) return this.MOVE_RESPONSE_NO_MOVE;
 
-		var newDestX = this.posX;
-		var newDestY = this.posY;
+		let newDestX = this.posX;
+		let newDestY = this.posY;
 		if (cmd >= 0 && cmd < Dir.COUNT) {
 			newDestX += Dir.vec[cmd][0] * .5;
 			newDestY += Dir.vec[cmd][1] * .5;
 		} else {
 			return this.MOVE_RESPONSE_NO_MOVE;
 		}
-		
+
 		if (this.moveIsBlocked(cmd, newDestX, newDestY)) {
-			moveFracMoving = false;
+			this.moveFracMoving = false;
 			return this.MOVE_RESPONSE_WAS_BLOCKED;
 		}
-		
+
 		//TODO - get this working? if it's even needed?  seems to be working fine without it ... (though things could drift...)
 		this.destPosX = newDestX;	//notice, this will only be floor() for positive values
 		this.destPosY = newDestY;	//good thing we never allow any negative ones
 		this.moveFrac = 0;
 		this.moveFracMoving = true;
-		
+
 		this.srcPosX = this.posX;
 		this.srcPosY = this.posY;
 
 		return this.MOVE_RESPONSE_DID_MOVE;
-	};
-	
-	this.update = function(dt) {
-		MovableObj.superProto.update.call(this, dt);
+	}
+
+	update(dt) {
+		super.update(dt);
 		if (this.moveFracMoving) {
 			this.moveFrac += dt * this.speed;
 			if (this.moveFrac >= 1) {
 				this.moveFracMoving = false;
 				this.posX = this.destPosX;
 				this.posY = this.destPosY;
-		
-				var thiz = this;
-				$.each(game.objs, function(_o,o) {
-					if (o.removeMe) return true;//continue;
-					if (o == thiz) return true;//continue;
-					
+
+				let thiz = this;
+				game.objs.forEach(o => {
+					if (o.removeMe) return;
+					if (o == thiz) return;
+
 					//if o's bbox at its destpos touches ours at our destpos then
-					if (this.linfDist(o.destPosX, o.destPosY, thiz.destPosX, thiz.destPosY) > .75) return true;//continue;
-					
+					if (this.linfDist(o.destPosX, o.destPosY, thiz.destPosX, thiz.destPosY) > .75) return;
+
 					o.endPush(thiz, thiz.destPosX, thiz.destPosY);
 				});
 
 			} else {
-				var oneMinusMoveFrac = 1 - this.moveFrac;
+				let oneMinusMoveFrac = 1 - this.moveFrac;
 				this.posX = this.destPosX * this.moveFrac + this.srcPosX * oneMinusMoveFrac;
 				this.posY = this.destPosY * this.moveFrac + this.srcPosY * oneMinusMoveFrac;
 			}
 		}
-		
+
 		if (!this.moveFracMoving) {
 			this.lastMoveResponse = this.doMove(this.moveCmd);
 		} else {
 			this.lastMoveResponse = this.MOVE_RESPONSE_NO_MOVE;
 		}
-	};
-})());
+	}
+}
+MovableObj.prototype.MOVE_RESPONSE_NO_MOVE = 0;
+MovableObj.prototype.MOVE_RESPONSE_WAS_BLOCKED = 1;
+MovableObj.prototype.MOVE_RESPONSE_DID_MOVE = 2;
 
-var PushableObj = makeClass(new (function(){
-	this.super = MovableObj;
-	
-	this.startPush = function(pusher, pushDestX, pushDestY, side) {
-		var superResult = PushableObj.superProto.startPush.call(this, pusher, pushDestX, pushDestY, side);
-		
+
+class PushableObj extends MovableObj {
+	startPush(pusher, pushDestX, pushDestY, side) {
+		let superResult = super.startPush(pusher, pushDestX, pushDestY, side);
+
 		//if (pusher instanceof Player)
 		{
 			if (!this.isBlocking) return false;
-			
-			var delta = 0;
+
+			let delta = 0;
 			switch (side) {
 			case Dir.LEFT:
 			case Dir.RIGHT:
@@ -613,10 +647,10 @@ var PushableObj = makeClass(new (function(){
 				break;
 			}
 			if (delta < 0) delta = -delta;
-			var align = delta < .25;
-			
+			let align = delta < .25;
+
 			if (align && !this.moveFracMoving) {
-				var moveResponse = this.doMove(side);
+				let moveResponse = this.doMove(side);
 				switch (moveResponse) {
 				case this.MOVE_RESPONSE_WAS_BLOCKED:
 					return true;
@@ -625,32 +659,30 @@ var PushableObj = makeClass(new (function(){
 				}
 			}
 		}
-		
-		return superResult;
-	};
 
-	this.hitObject = function(what, pushDestX, pushDestY, side) {
+		return superResult;
+	}
+
+	hitObject(what, pushDestX, pushDestY, side) {
 		//this is the only place isBlockingPushers is referenced
-		//it happens when a PushableObj moves into another object 
+		//it happens when a PushableObj moves into another object
 		//this - the PushableObj
 		//what - the other object it moved into
 		//	TODO - clean up isBlocking and isBlockingPushers! at least rename them to something less ambiguous!
 		if (what.isBlockingPushers) return this.HIT_RESPONSE_STOP;
-		
-		return PushableObj.superProto.hitObject.call(this, what, pushDestX, pushDestY, side);
-	};
-})());
+
+		return super.hitObject(what, pushDestX, pushDestY, side);
+	}
+}
 
 //TODO alpha test, and threshold alpha at .5 or something
-var Cloud = makeClass(new (function(){
-	this.super = BaseObj;
-	this.isBlocking = false;
-	this.isBlockingPushers = false;
-	this.blocksExplosion = false;
-	this.blend = 'alpha-threshold';
-
-	this.init = function(args) {
-		Cloud.super.call(this);
+class Cloud extends BaseObj {
+	constructor(args) {
+		super();	
+		this.isBlocking = false;
+		this.isBlockingPushers = false;
+		this.blocksExplosion = false;
+		this.blend = 'alpha-threshold';
 		this.vel = args.vel;
 		this.life = args.life;
 		this.scale = [args.scale, args.scale],
@@ -658,14 +690,14 @@ var Cloud = makeClass(new (function(){
 		this.startTime = game.time;
 		this.setSeq(Animation.prototype.SEQ_CLOUD);
 		this.color = [1,1,1,1];
-	};
+	}
 
-	this.update = function(dt) {
-		Cloud.superProto.update.call(this, dt);
+	update(dt) {
+		super.update(dt);
 
 		this.setPos(this.posX + dt * this.vel[0], this.posY + dt * this.vel[1]);
 
-		var frac = (game.time - this.startTime) / this.life;
+		let frac = (game.time - this.startTime) / this.life;
 		if (frac > 1) frac = 1;
 		this.color[3] = (1-frac)*(1-frac);
 
@@ -673,34 +705,32 @@ var Cloud = makeClass(new (function(){
 			game.removeObj(this);
 			return;
 		}
-	};
-})());
+	}
+}
 
-var Particle = makeClass(new (function(){
-	this.super = BaseObj;
-	this.isBlocking = false;
-	this.isBlockingPushers = false;
-	this.blocksExplosion = false;
-
-	this.init = function(args) {
-		Particle.super.call(this);
+class Particle extends BaseObj {
+	constructor(args) {
+		super();
+		this.isBlocking = false;
+		this.isBlockingPushers = false;
+		this.blocksExplosion = false;
 		this.vel = args.vel;
 		this.life = args.life;	//in seconds
-		this.color = args.color !== undefined ? args.color.clone() : [1,1,1,1];
-		this.srccolor = this.color.clone();
+		this.color = args.color !== undefined ? arrayClone(args.color) : [1,1,1,1];
+		this.srccolor = arrayClone(this.color);
 		this.scale = [args.radius * 2, args.radius * 2];
 		this.setPos(args.pos[0], args.pos[1]);
 		this.startTime = game.time;
 		if (args.blend !== undefined) this.blend = args.blend;
 		this.setSeq(args.seq !== undefined ? args.seq : Animation.prototype.SEQ_SPARK);
-	};
-	
-	this.update = function(dt) {
-		Particle.superProto.update.call(this, dt);
+	}
+
+	update(dt) {
+		super.update(dt);
 
 		this.setPos(this.posX + dt * this.vel[0], this.posY + dt * this.vel[1]);
 
-		var frac = 1 - (game.time - this.startTime) / this.life;
+		let frac = 1 - (game.time - this.startTime) / this.life;
 		if (frac < 0) frac = 0;
 		this.color[3] = this.srccolor[3] * frac;
 
@@ -708,99 +738,79 @@ var Particle = makeClass(new (function(){
 			game.removeObj(this);
 			return;
 		}
-	};
-})());
+	}
+}
 
-var Bomb = makeClass(new (function(){
-	this.super = PushableObj;
-	this.boomTime = 0;
-	this.blastRadius = 1;
-	this.explodingDone = 0;
-	this.sinkDone = 0;
-	this.throwDone = 0;
-	
-	this.owner = undefined;
-	this.ownerStandingOn = false;
-	
-	this.holder = undefined;
-	
-	this.STATE_IDLE = 0;
-	this.STATE_LIVE = 1;
-	this.STATE_EXPLODING = 2;
-	this.STATE_SINKING = 3;
-	
-	this.state = this.STATE_IDLE;
-	
-	this.fuseDuration = 5;
-	this.chainDuration = .2;
-	this.explodingDuration = .2;
-	this.sinkDuration = 5;
-	this.throwDuration = 1;
-	
-	this.THROW_HEIGHT = 2;
-	this.THROW_DIST = 3;
-	
+class Bomb extends PushableObj {
 	//I wonder if setting 'isBlockingPushers' to 'true' would make it so the player could push multiple blocks?
 	//would this be cool?
-	
-	this.init = function(owner) {
-		Bomb.super.call(this);
+
+	constructor(owner) {
+		super();
+		
+		this.owner = undefined;
+		this.ownerStandingOn = false;
+
+		this.holder = undefined;
+
+		this.state = this.STATE_IDLE;
+
 		this.owner = owner;
 		if (owner !== undefined) this.ownerStandingOn = true;
 		this.setSeq(Animation.prototype.SEQ_BOMB);
-		
+
 		this.gameNumbers = new GameNumbers();
 	};
-	
+
 	//called via moveIsBlocked when a bomb is placed
 	//this will also get called if the bomb pushes something else (which can't happen atm)
-	this.hitObject = function(whatWasHit, pushDestX, pushDestY, side) {
+	hitObject(whatWasHit, pushDestX, pushDestY, side) {
 		//same condition as below
 		if (whatWasHit == this.owner && this.owner !== undefined && this.ownerStandingOn) return this.HIT_RESPONSE_MOVE_THRU;
-		return Bomb.superProto.hitObject.call(this, whatWasHit, pushDestX, pushDestY, side);
-	};
+		return super.hitObject(whatWasHit, pushDestX, pushDestY, side);
+	}
 
 	//called when a player walks into a bomb to start pushing it
-	this.startPush = function(pusher, pushDestX, pushDestY, side) {
+	startPush(pusher, pushDestX, pushDestY, side) {
 		//if the owner is still standing on the bomb they dropped
 		//then let them walk through it
 		//in the update, check owner's dist, and clear this flag if they moved too far
-		
+
 		if (pusher == this.owner &&	//should always be true...
 			this.owner !== undefined &&
 			this.ownerStandingOn)
 		{
 			return false;
 		}
-		
+
 		//if the bomb is picked up then it won't be pushable / block anything / etc
 		if (this.holder !== undefined) {
 			return false;
 		}
-		return Bomb.superProto.startPush.call(this, pusher, pushDestX, pushDestY, side);
-	};
-	
+		return super.startPush(pusher, pushDestX, pushDestY, side);
+	}
+
 	//only works if we have a holder
 	//next it clears the holder (doesn't matter)
 	//throws
 	//if the bomb would detonate while in air, have it hold off...
 	//then it lands ...
 	//and continues as normal
-	this.throwMe = function(dir) {
+	throwMe(dir) {
 		if (dir < 0 || dir >= Dir.COUNT) return;
 		if (this.holder === undefined) return;
-		
+
 		this.posX = this.srcPosX = this.holder.destPosX;
 		this.posY = this.srcPosY = this.holder.destPosY;
-		
+
 		this.destPosX = this.srcPosX + Dir.vec[dir][0] * this.THROW_DIST;
 		this.destPosY = this.srcPosY + Dir.vec[dir][1] * this.THROW_DIST;
-		
+
 		this.holder = undefined;	//doesn't matter anymore
 		this.throwDone = game.time + this.throwDuration;
-	};
-	
-	this.setFuse = function(fuseTime) {
+	}
+
+	setFuse(fuseTime) {
 		if (this.state == this.STATE_EXPLODING ||
 			this.state == this.STATE_SINKING)
 		{
@@ -809,31 +819,28 @@ var Bomb = makeClass(new (function(){
 		this.setSeq(Animation.prototype.SEQ_BOMB_LIT);
 		this.state = this.STATE_LIVE;
 		this.boomTime = game.time + fuseTime;
-	};
-	
+	}
+
 	//bombs can only pass thru empty and water
-	this.cannotPassThru = function(maptype) {
+	cannotPassThru(maptype) {
 		//if it doesn't blocks movement then we're good
-		var res = Bomb.superProto.cannotPassThru.call(this, maptype);
+		const res = super.cannotPassThru(maptype);
 		if (!res) return false;
-		
+
 		//if the maptype doesn't float objects then it will block the bomb
 		//(do this check for any movable objects that can traverse water)
 		//(maybe make that a movement flag or something?)
 		return maptype != Game.prototype.MAPTYPE_WATER;
-	};
-	
-	this.drawSprite = function(c, rect) {
-		var x = this.posX;
-		var y = this.posY;
-		
+	}
+
+	drawSprite(c, rect) {
 		//hack: push & pop position between draw cmd
 		//the other way: new method for underlying drawing of sprite that gets passed x,y
 		if (this.holder !== undefined) {
 			this.posY -= .75;
 		}
 
-		Bomb.superProto.drawSprite.call(this, c, rect);
+		super.drawSprite(c, rect);
 
 		if (this.state == this.STATE_IDLE || this.state == this.STATE_LIVE) {
 			this.gameNumbers.draw(c, rect, this.blastRadius, this.posX, this.posY);
@@ -842,20 +849,21 @@ var Bomb = makeClass(new (function(){
 		if (this.holder !== undefined) {
 			this.posY += .75;
 		}
-	};
+	}
 
-	this.onKeyTouch = function() {
+	onKeyTouch() {
 		game.removeObj(this);
-	};
-	
-	this.setHolder = function(holder) {
+	}
+
+	setHolder(holder) {
 		this.holder = holder;
 		this.isBlocking = false;
 		this.isBlockingPushers = false;
-	};
-	
-	this.update = function(dt) {
-		Bomb.superProto.update.call(this, dt);
+	}
+
+	update(dt) {
+		const thiz = this;
+		super.update(dt);
 
 		if (this.holder !== undefined) {
 			//well we can clear the ownerStandingOn flag ...
@@ -873,12 +881,12 @@ var Bomb = makeClass(new (function(){
 				this.ownerStandingOn = false;
 			}
 		}
-		
-		if (this.throwDone > 0 && 
+
+		if (this.throwDone > 0 &&
 			(this.state == this.STATE_IDLE || this.state == this.STATE_LIVE))
 		{
 			//console.log("Bomb.update throwDone > 0: updating throw");
-			var throwDt = game.time - (this.throwDone - this.throwDuration);
+			let throwDt = game.time - (this.throwDone - this.throwDuration);
 			//console.log("Bomb.update throwDt = " + throwDt);
 			if (this.throwDt > this.throwDuration) {
 			//console.log("Bomb.update throwDt > throwDuration: clearing throwDone");
@@ -886,42 +894,42 @@ var Bomb = makeClass(new (function(){
 			} else {
 				//console.log("Bomb.update throwDt <= THROW_DURAATION: calculating position");
 
-				var throwFrac = throwDt / this.throwDuration;
+				let throwFrac = throwDt / this.throwDuration;
 				//console.log("Bomb.update throwFrac: " + throwFrac);
-				
+
 				//console.log("Bomb.update moving from " + this.srcPosX + ", " + this.srcPosY +  " to " + this.destPosX + ", " + this.destPosY);
-				var oneMinusThrowFrac = 1 - throwFrac;
+				let oneMinusThrowFrac = 1 - throwFrac;
 				this.posX = this.destPosX * throwFrac + this.srcPosX * oneMinusThrowFrac;
 				this.posY = this.destPosY * throwFrac + this.srcPosY * oneMinusThrowFrac;
-				
+
 				this.posY -= 2 * throwFrac * oneMinusThrowFrac * this.THROW_HEIGHT;
-				
+
 				//if we're being thrown then return before checking for explosions
 				return;
 			}
 		}
-		
+
 		//test whether what we were pushed into water
 		//TODO - rewrite this as startPush?  I think you can do that ...
 		if (this.state == this.STATE_IDLE || this.state == this.STATE_LIVE) {
 			//TODO - will this get skipped if it gets pushed immediately after it stopped moving across the last tile?
 			if (!this.moveFracMoving) {	//not moving at the moment
-				var typeUL = game.getMapTypeIndex(this.destPosX - .25, this.destPosY - .25);
-				var typeUR = game.getMapTypeIndex(this.destPosX + .25, this.destPosY - .25);
-				var typeLL = game.getMapTypeIndex(this.destPosX - .25, this.destPosY + .25);
-				var typeLR = game.getMapTypeIndex(this.destPosX + .25, this.destPosY + .25);
+				const typeUL = game.getMapTypeIndex(this.destPosX - .25, this.destPosY - .25);
+				const typeUR = game.getMapTypeIndex(this.destPosX + .25, this.destPosY - .25);
+				const typeLL = game.getMapTypeIndex(this.destPosX - .25, this.destPosY + .25);
+				const typeLR = game.getMapTypeIndex(this.destPosX + .25, this.destPosY + .25);
 
-				var thiz = this;
-				$.each(game.objs, function(_o,o) {
-					if (o.removeMe) return true;//continue;
-					if (o.isa(Bomb) && o.state == o.STATE_SINKING) {
+				game.objs.forEach(o => {
+					if (!o.removeMe &&
+						o instanceof Bomb && o.state == o.STATE_SINKING
+					) {
 						if (typeUL == game.MAPTYPE_WATER && thiz.linfDist(o.destPosX, o.destPosY, thiz.destPosX - .25, thiz.destPosY - .25) < .5) typeUL = game.MAPTYPE_EMPTY;
 						if (typeUR == game.MAPTYPE_WATER && thiz.linfDist(o.destPosX, o.destPosY, thiz.destPosX + .25, thiz.destPosY - .25) < .5) typeUR = game.MAPTYPE_EMPTY;
 						if (typeLL == game.MAPTYPE_WATER && thiz.linfDist(o.destPosX, o.destPosY, thiz.destPosX - .25, thiz.destPosY + .25) < .5) typeLL = game.MAPTYPE_EMPTY;
 						if (typeLR == game.MAPTYPE_WATER && thiz.linfDist(o.destPosX, o.destPosY, thiz.destPosX + .25, thiz.destPosY + .25) < .5) typeLR = game.MAPTYPE_EMPTY;
 					}
 				});
-				
+
 				if (typeUL == game.MAPTYPE_WATER &&
 					typeUR == game.MAPTYPE_WATER &&
 					typeLL == game.MAPTYPE_WATER &&
@@ -935,44 +943,44 @@ var Bomb = makeClass(new (function(){
 				}
 			}
 		}
-		
+
 		//if state is idle...
 		if (this.state == this.STATE_LIVE) {
-			var t = game.time - this.boomTime;
-			var s = Math.cos(2*t*Math.PI)*.2+.9;
+			const t = game.time - this.boomTime;
+			const s = Math.cos(2*t*Math.PI)*.2+.9;
 			this.scale = [s,s];
 			if (t >= 0) {
 				this.explode();
 			}
 		} else if (this.state == this.STATE_EXPLODING) {
-			var t = game.time - this.explodingDone;
+			const t = game.time - this.explodingDone;
 			if (t >= 0) {
 				game.removeObj(this);
 			}
 		} else if (this.state == this.STATE_SINKING) {
-			var t = game.time - this.sinkDone;
+			const t = game.time - this.sinkDone;
 			if (t >= 0) {
 
 				//remove first so it doesn't influence the checks for sunk bombs
 				game.removeObj(this);
-				
+
 				//then we're sunk
 				//check for anything standing on us ... and kill it
-				var thiz = this;
-				$.each(game.objs, function(_o,o) {
-					if (o.removeMe) return true;//continue;
-					//if this object is .25 tile on the sunk bomb...
-					if (thiz.linfDist(o.destPosX, o.destPosY, thiz.destPosX, thiz.destPosY) < .75) {
-						
+				game.objs.forEach(o => {
+					if (!o.removeMe && 
+						//if this object is .25 tile on the sunk bomb...
+						thiz.linfDist(o.destPosX, o.destPosY, thiz.destPosX, thiz.destPosY) < .75
+					) {
 						//now check all the types under this object
-						var typeUL = game.getMapTypeIndex(o.destPosX - .25, o.destPosY - .25);
-						var typeUR = game.getMapTypeIndex(o.destPosX + .25, o.destPosY - .25);
-						var typeLL = game.getMapTypeIndex(o.destPosX - .25, o.destPosY + .25);
-						var typeLR = game.getMapTypeIndex(o.destPosX + .25, o.destPosY + .25);
-					
-						$.each(game.objs, function(_o2,o2) {
-							if (o2.removeMe) return true;//continue;
-							if (o2.isa(Bomb) && o2.state == o2.STATE_SINKING) {
+						const typeUL = game.getMapTypeIndex(o.destPosX - .25, o.destPosY - .25);
+						const typeUR = game.getMapTypeIndex(o.destPosX + .25, o.destPosY - .25);
+						const typeLL = game.getMapTypeIndex(o.destPosX - .25, o.destPosY + .25);
+						const typeLR = game.getMapTypeIndex(o.destPosX + .25, o.destPosY + .25);
+
+						game.objs.forEach(o2 => {
+							if (!o2.removeMe && 
+								o2 instanceof Bomb && o2.state == o2.STATE_SINKING
+							) {
 								if (typeUL == Game.MAPTYPE_WATER && thiz.linfDist(o2.destPosX, o2.destPosY, o.destPosX - .25, o.destPosY - .25) < .5) typeUL = game.MAPTYPE_EMPTY;
 								if (typeUR == Game.MAPTYPE_WATER && thiz.linfDist(o2.destPosX, o2.destPosY, o.destPosX + .25, o.destPosY - .25) < .5) typeUR = game.MAPTYPE_EMPTY;
 								if (typeLL == Game.MAPTYPE_WATER && thiz.linfDist(o2.destPosX, o2.destPosY, o.destPosX - .25, o.destPosY + .25) < .5) typeLL = game.MAPTYPE_EMPTY;
@@ -991,23 +999,22 @@ var Bomb = makeClass(new (function(){
 						}
 					}
 				});
-				
+
 				return;
 			}
 		}
 		//else if state is boom ... do something else
-	};
-	
-	this.onGroundSunk = function() {};	//do nothing
-	
-	this.onTouchFlames = function() {
-		this.setFuse(this.chainDuration);
-	};
-	
-	this.explode = function() {
+	}
 
-		for (var i = 0; i < 10; ++i) {
-			var scale = Math.random() * 2;
+	onGroundSunk() {}	//do nothing
+
+	onTouchFlames () {
+		this.setFuse(this.chainDuration);
+	}
+
+	explode() {
+		for (let i = 0; i < 10; ++i) {
+			const scale = Math.random() * 2;
 			game.addObj(new Cloud({
 				pos : [this.posX, this.posY],
 				vel : [Math.random()*2-1, Math.random()*2-1],
@@ -1017,44 +1024,42 @@ var Bomb = makeClass(new (function(){
 		}
 
 		//if a bomb is half off in either direction then it can't destroy tiles
-		//hmm the half tiles is a lolo issue ... 
+		//hmm the half tiles is a lolo issue ...
 		//maybe for bomberman's sake we should snap to tiles? or only allow blocks
 		//to be whole-tile-pushable?  but that'll make constraining the placement of bombs difficult?
 		//or maybe not?
-		
-		var cantHitWorld = false;
-		var fpartx = this.destPosX - Math.floor(this.destPosX);
-		var fparty = this.destPosY - Math.floor(this.destPosY);
+
+		let cantHitWorld = false;
+		let fpartx = this.destPosX - Math.floor(this.destPosX);
+		let fparty = this.destPosY - Math.floor(this.destPosY);
 		if (fpartx < .25 || fpartx > .75 ||
 			fparty < .25 || fparty > .75)
 		{
 			cantHitWorld = true;
 		}
-	
-		for (var side = 0; side < Dir.COUNT; side++) {
-			var checkPosX = this.destPosX;
-			var checkPosY = this.destPosY;
-			var len = 0;
-			while(true) {
-				var hit = false;
-				var thiz = this;
-				$.each(game.objs, function(_o,o) {
-					if (o.removeMe) return true;//continue;
-					if (o == thiz) return true;//continue;
-					
-					var dist = thiz.linfDist(o.destPosX, o.destPosY, checkPosX, checkPosY);
 
-					//if a flame is even half a block off from an obj then it won't be hit
-					//...except for the player
-					//TODO - class-based var?
-					if (o.isa(Player)) {
-						if (dist > .75) return true;//continue;
-					} else {
-						if (dist > .25) return true;//continue;
+		for (let side = 0; side < Dir.COUNT; side++) {
+			let checkPosX = this.destPosX;
+			let checkPosY = this.destPosY;
+			let len = 0;
+			while(true) {
+				let hit = false;
+				let thiz = this;
+				game.objs.forEach(o => {
+					if (!o.removeMe &&
+						o != thiz
+					) {
+						const dist = thiz.linfDist(o.destPosX, o.destPosY, checkPosX, checkPosY);
+						//if a flame is even half a block off from an obj then it won't be hit
+						//...except for the player
+						//TODO - class-based let?
+						if (o instanceof Player && dist > .75) {
+						} else if (dist > .25) {
+						} else {
+							o.onTouchFlames();
+							if (o.blocksExplosion) hit = true;
+						}
 					}
-					
-					o.onTouchFlames();
-					if (o.blocksExplosion) hit = true;					
 				});
 
 				//TODO - make spark temp ents
@@ -1069,13 +1074,13 @@ var Bomb = makeClass(new (function(){
 
 				checkPosX += Dir.vec[side][0];
 				checkPosY += Dir.vec[side][1];
-				
-				var wallStopped = false;
-				for (var ofx = 0; ofx < 2; ofx++) {
-					for (var ofy = 0; ofy < 2; ofy++) {
-						var cfx = Math.floor(checkPosX + ofx * .5 - .25);
-						var cfy = Math.floor(checkPosY + ofy * .5 - .25);
-						var mapType = game.getMapType(cfx, cfy);
+
+				let wallStopped = false;
+				for (let ofx = 0; ofx < 2; ofx++) {
+					for (let ofy = 0; ofy < 2; ofy++) {
+						const cfx = Math.floor(checkPosX + ofx * .5 - .25);
+						const cfy = Math.floor(checkPosY + ofy * .5 - .25);
+						const mapType = game.getMapType(cfx, cfy);
 						if ((mapType.flags & mapType.BLOCKS_EXPLOSIONS) != 0) {
 							//if it's half a block off then it can still be stopped
 							//but it can't clear a wall
@@ -1084,10 +1089,10 @@ var Bomb = makeClass(new (function(){
 								(mapType.flags & mapType.BOMBABLE) != 0)	//only turn bricks into empty
 							{
 								//make some particles
-								var divs = 1;
-								for (var u = 0; u < divs; ++u) {
-									for (var v = 0; v < divs; ++v) {
-										var speed = 0;
+								const divs = 1;
+								for (let u = 0; u < divs; ++u) {
+									for (let v = 0; v < divs; ++v) {
+										let speed = 0;
 										game.addObj(new Particle({
 											vel : [speed*(Math.random()*2-1), speed*(Math.random()*2-1)],
 											pos : [cfx + (u+.5)/divs, cfy + (v+.5)/divs],
@@ -1098,7 +1103,7 @@ var Bomb = makeClass(new (function(){
 										}));
 									}
 								}
-								
+
 								game.setMapTypeIndex(cfx, cfy, game.MAPTYPE_EMPTY);
 							}
 							wallStopped = true;
@@ -1108,15 +1113,15 @@ var Bomb = makeClass(new (function(){
 				if (wallStopped) break;
 			}
 		}
-		
+
 		this.state = this.STATE_EXPLODING;
 		this.explodingDone = game.time + this.explodingDuration;
-	};
-	
-	this.makeSpark = function(x, y) {
-		//for (var i = 0; i < 10; ++i) {
-		for (var i = 0; i < 3; ++i) {
-			var c = Math.random();
+	}
+
+	makeSpark(x, y) {
+		//for (let i = 0; i < 10; ++i) {
+		for (let i = 0; i < 3; ++i) {
+			let c = Math.random();
 			game.addObj(new Particle({
 				vel : [Math.random()*2-1, Math.random()*2-1],
 				pos : [x,y],
@@ -1126,66 +1131,77 @@ var Bomb = makeClass(new (function(){
 				blend : 'lighter'
 			}));
 		}
-	};
-})());
+	}
+}
+Bomb.prototype.boomTime = 0;
+Bomb.prototype.blastRadius = 1;
+Bomb.prototype.explodingDone = 0;
+Bomb.prototype.sinkDone = 0;
+Bomb.prototype.throwDone = 0;
 
-var GunShot = makeClass(new (function(){
-	this.super = MovableObj;
-	
-	this.owner = undefined;
-	
-	this.init = function(owner) {
-		GunShot.super.call(this);
+Bomb.prototype.fuseDuration = 5;
+Bomb.prototype.chainDuration = .2;
+Bomb.prototype.explodingDuration = .2;
+Bomb.prototype.sinkDuration = 5;
+Bomb.prototype.throwDuration = 1;
+
+Bomb.prototype.STATE_IDLE = 0;
+Bomb.prototype.STATE_LIVE = 1;
+Bomb.prototype.STATE_EXPLODING = 2;
+Bomb.prototype.STATE_SINKING = 3;
+
+Bomb.prototype.THROW_HEIGHT = 2;
+Bomb.prototype.THROW_DIST = 3;
+
+
+class GunShot extends MovableObj {
+	constructor(owner) {
+		super();
 		this.owner = owner;
 		this.setPos(owner.posX, owner.posY);
 		this.frameId = -1;	//invis
-	};
-	this.cannotPassThru = function(maptype) {
+	}
+	cannotPassThru(maptype) {
 		return (game.mapTypes[maptype].flags & MapType.prototype.BLOCKS_GUNSHOT) != 0;
-	};
-	
-	this.hitObject = function(what, pushDestX, pushDestY, side) {
+	}
+
+	hitObject(what, pushDestX, pushDestY, side) {
 		if (what == this.owner) return this.HIT_RESPONSE_MOVE_THRU;
-		if (what.isa(Player)) {
+		if (what instanceof Player) {
 			what.die();
 			return this.HIT_RESPONSE_STOP;
 		}
-		if (what.isBlocking || what.isa(Money)) return this.HIT_RESPONSE_STOP;
+		if (what.isBlocking || what instanceof Money) return this.HIT_RESPONSE_STOP;
 		return this.HIT_RESPONSE_MOVE_THRU;
-	};
-})());
+	}
+}
 
-var Gun = makeClass(new (function(){
-	this.super = BaseObj;
-
-	this.MAD_DIST = .75;
-	this.FIRE_DIST = .25;
-
-	this.init = function() {
-		Gun.super.call(this);
+class Gun extends BaseObj {
+	constructor() {
+		super();
 		this.setSeq(Animation.prototype.SEQ_GUN);
-	};
-	
-	this.update = function(dt) {
-		Gun.superProto.update.call(this, dt);
-		
+	}
+
+	update(dt) {
+		super.update(dt);
+
 		this.setSeq(Animation.prototype.SEQ_GUN);
-		
+
 		if (game.player !== undefined &&
 			!game.player.dead)
 		{
-			var diffX = game.player.posX - this.posX;
-			var diffY = game.player.posY - this.posY;
-			var absDiffX = diffX < 0 ? -diffX : diffX;
-			var absDiffY = diffY < 0 ? -diffY : diffY;
-			var dist = absDiffX < absDiffY ? absDiffX : absDiffY;
-			
+			let diffX = game.player.posX - this.posX;
+			let diffY = game.player.posY - this.posY;
+			let absDiffX = diffX < 0 ? -diffX : diffX;
+			let absDiffY = diffY < 0 ? -diffY : diffY;
+			let dist = absDiffX < absDiffY ? absDiffX : absDiffY;
+
 			if (dist < this.MAD_DIST) {
 				this.setSeq(Animation.prototype.SEQ_GUN_MAD);
 			}
-			
+
 			if (dist < this.FIRE_DIST) {
-				var dir = Dir.NONE;
+				let dir = Dir.NONE;
 				if (diffX < diffY) {	//left or down
 					if (diffX < -diffY) {
 						dir = Dir.LEFT;
@@ -1199,9 +1215,9 @@ var Gun = makeClass(new (function(){
 						dir = Dir.RIGHT;
 					}
 				}
-				
-				var shot = new GunShot(this);
-				var response = -1;
+
+				let shot = new GunShot(this);
+				let response = -1;
 				do {
 					response = shot.doMove(dir);
 					shot.setPos(shot.destPosX, shot.destPosY);
@@ -1209,35 +1225,34 @@ var Gun = makeClass(new (function(){
 				//delete ... but it's not attached, so we're safe
 			}
 		}
-	};
-	
-	this.onKeyTouch = function() {
+	}
+
+	onKeyTouch() {
 		//puff
 		game.removeObj(this);
-	};
-})());
+	}
+}
+Gun.prototype.MAD_DIST = .75;
+Gun.prototype.FIRE_DIST = .25;
 
-var Sentry = makeClass(new (function(){
-	this.super = MovableObj;
-	
-	this.dir = Dir.LEFT;
-	
-	this.init = function() {
-		Sentry.super.call(this);
+class Sentry extends MovableObj {
+	constructor() {
+		super();
+		this.dir = Dir.LEFT;
 		this.setSeq(Animation.prototype.SEQ_SENTRY);
-	};
-	
-	this.update = function(dt) {
+	}
+
+	update(dt) {
 		//if the player moved onto us ...
 		//TODO - put this inside 'endPush' instead! no need to call it each frame
 		if (this.linfDist(this.destPosX, this.destPosY, game.player.destPosX, game.player.destPosY) < .75) {
 			game.player.die();
 		}
-	
+
 		this.moveCmd = this.dir;
-		
-		Sentry.superProto.update.call(this, dt);
-		
+
+		super.update(dt);
+
 		if (this.lastMoveResponse == this.MOVE_RESPONSE_WAS_BLOCKED) {
 			switch (this.dir) {
 			case Dir.UP:	this.dir = Dir.LEFT;		break;
@@ -1246,75 +1261,66 @@ var Sentry = makeClass(new (function(){
 			case Dir.RIGHT:	this.dir = Dir.UP;		break;
 			}
 		}
-	};
-	
+	}
+
 	//the sentry tried to move and hit an object...
-	this.hitObject = function(what, pushDestX, pushDestY, side) {
-		
-		if (what.isa(Player)) {
+	hitObject(what, pushDestX, pushDestY, side) {
+
+		if (what instanceof Player) {
 			return this.HIT_RESPONSE_MOVE_THRU;	//wait for the update() test to pick up hitting the player
 		}
-		return what.isBlockingSentry() ? this.HIT_RESPONSE_STOP : this.HIT_RESPONSE_TEST_OBJECT;	
+		return what.isBlockingSentry() ? this.HIT_RESPONSE_STOP : this.HIT_RESPONSE_TEST_OBJECT;
 		//return super.hitObject(what, pushDestX, pushDestY, side);
-	};
+	}
 
-	this.onKeyTouch = function() {
+	onKeyTouch() {
 		//puff
 		game.removeObj(this);
-	};
-})());
+	}
+}
 
-var Framer = makeClass(new (function(){
-	this.super = PushableObj;
-	this.init = function() {
-		Framer.super.call(this);
+class Framer extends PushableObj {
+	constructor() {
+		super();
 		this.setSeq(Animation.prototype.SEQ_FRAMER);
-	};
-})());
+	}
+}
 
-var Player = makeClass(new (function(){
-	this.super = MovableObj;
+class Player extends MovableObj {
+	constructor(...args) {
+		super(...args);
+		
+		//I could combine these two into one ... like I do with Key's touchTime
+		this.dead = false;	//whether we're dead or not
+		this.deadTime = 0;		//how long we've been dead
 
-	this.ITEM_GLOVES = 1;
-	//what other items might we want to make?
-	//portal gun
-	//incinerator?
-	//bomb-through-walls?
-	//walk-through-walls?
+		this.dir = Dir.DOWN;
 
-	//I could combine these two into one ... like I do with Key's touchTime
-	this.dead = false;	//whether we're dead or not
-	this.deadTime = 0;		//how long we've been dead
-	
-	this.dir = Dir.DOWN;
-	
-	this.bombs = 0;
-	this.bombBlastRadius = 1;	//how big the bombs placed will be
-	this.items = 0;	//item bitflags
-	
-	//input-based: whether the user is pressing down on the drop-bomb button
-	this.dropBombFlag = false;
-	
-	//whether the Player is holding a bomb
-	this.bombHeld = undefined;
-	
-	this.init = function() {
-		Player.super.apply(this, arguments);
+		this.bombs = 0;
+		this.bombBlastRadius = 1;	//how big the bombs placed will be
+		this.items = 0;	//item bitflags
+
+		//input-based: whether the user is pressing down on the drop-bomb button
+		this.dropBombFlag = false;
+
+		//whether the Player is holding a bomb
+		this.bombHeld = undefined;
+
 		this.setSeq(Animation.prototype.SEQ_PLAYER_STAND_DOWN);
 		this.setBombs(this.bombs);
-	};
-	
-	this.move = function(dir) {
+	}
+
+	move(dir) {
 		if (this.dead) return;
 		this.moveCmd = dir;
-	};
-	
-	this.beginDropBomb = function() {
+	}
+
+	beginDropBomb() {
 		if (this.dead) return;
 		if (this.dropBombFlag) return;
 		this.dropBombFlag = true;
 		if (this.bombs <= 0) return;
-		
+
 		//make sure nothing's there ...
 		//bombs can only be placed on empty, or water if a bomb has already been pushed into that block of water...
 		if (this.bombHeld !== undefined) {
@@ -1324,8 +1330,8 @@ var Player = makeClass(new (function(){
 			this.bombHeld = undefined;
 			return;
 		}
-		
-		var bomb = new Bomb(this);
+
+		let bomb = new Bomb(this);
 		bomb.setPos(this.destPosX, this.destPosY);
 		//bomb placement will only be blocked if...
 		//(a) another bomb is under it
@@ -1339,13 +1345,14 @@ var Player = makeClass(new (function(){
 		//then we can assert it's a good tile ...
 		//... unless they've dropped a bomb and are standing on it ... (linfDist < .4)
 		//and in that case the player's gloves come in handy ...
-		var thiz = this;
-		var doReturn = undefined;
-		$.each(game.objs, function(_o,o) {
-			if (o.removeMe) return true;//continue;
+		let thiz = this;
+		let doReturn = undefined;
+		for (let i = 0; i < game.objs.length; ++i) {
+			const o = game.objs[i];
+			if (o.removeMe) continue;
 			//don't need to test for our current bomb since it hasn't been added yet (and wouldn't be this frame anyways)
-			if (o.isa(Bomb)) {
-				var otherBomb = o;
+			if (o instanceof Bomb) {
+				let otherBomb = o;
 				if (otherBomb.owner == thiz &&
 					thiz.linfDist(thiz.destPosX, thiz.destPosY, otherBomb.destPosX, otherBomb.destPosY) < .25 &&
 					(otherBomb.state == otherBomb.STATE_IDLE || otherBomb.state == otherBomb.STATE_LIVE))
@@ -1353,9 +1360,9 @@ var Player = makeClass(new (function(){
 					//by here otherBomb is a blocking bomb that we own that we're standing on
 					//we're either going to pick it up or it'll block our newly placed bomb
 					//so either way, return at the end of this block
-					
+
 					if ((thiz.items & thiz.ITEM_GLOVES) != 0) {
-				
+
 						//then do the gloves on the otherBomb!
 						//gloves can also pick up bombs in front of the player, right?
 						//that should be tested (the tile in front of the player)
@@ -1363,36 +1370,36 @@ var Player = makeClass(new (function(){
 						thiz.bombHeld = otherBomb;
 						otherBomb.holder = thiz;
 					}
-				
+
 					doReturn = true;
-					return false;//break;
+					break;
 				}
 			}
-		});
+		}
 		if (doReturn) return;
-		
+
 		this.setBombs(this.bombs - 1);
 		bomb.blastRadius = this.bombBlastRadius;
 		bomb.setFuse(Bomb.prototype.fuseDuration);
 		game.addObj(bomb);
-	};
-	
-	this.endDropBombs = function() {
-		this.dropBombFlag = false;
-	};
+	}
 
-	this.stopMoving = function() {
+	endDropBombs() {
+		this.dropBombFlag = false;
+	}
+
+	stopMoving() {
 		this.moveCmd = Dir.NONE;	//clear for next time through
-	};
-	
-	this.update = function(dt) {
+	}
+
+	update(dt) {
 
 		if (this.moveCmd != Dir.NONE) {
 			this.dir = this.moveCmd;
 		}
-		
-		Player.superProto.update.call(this, dt);
-		
+
+		super.update(dt);
+
 		if (this.dead) {
 			//setSeq(Animation.prototype.SEQ_PLAYER_DEAD);
 		} else {
@@ -1427,21 +1434,21 @@ var Player = makeClass(new (function(){
 				case 3:
 					this.setSeq(Animation.prototype.SEQ_PLAYER_STAND_RIGHT);
 					break;
-				}		
+				}
 			}
 		}
-	};
-	
-	this.getMoney = function(money) {
+	}
+
+	getMoney(money) {
 		this.setBombs(this.bombs + money.bombs);
 		this.items |= money.items;
-	};
-	
-	this.onTouchFlames = function() {
+	}
+
+	onTouchFlames() {
 		this.die();
-	};
-	
-	this.die = function() {
+	}
+
+	die() {
 		if (this.dead) return;
 		this.setSeq(Animation.prototype.SEQ_PLAYER_DEAD);
 		this.dead = true;
@@ -1453,103 +1460,107 @@ var Player = makeClass(new (function(){
 
 		this.moveCmd = -1;
 		this.dropBombFlag = false;
-	};
+	}
 
-	this.onGroundSunk = function() {
+	onGroundSunk() {
 		this.die();
-	};
-	
-	this.setBombs = function(bombs) {
+	}
+
+	setBombs(bombs) {
 		this.bombs = bombs;
-		$('#game-hud-bombs').text(this.bombs);
-	};
-})());
+		ids.game_hud_bombs.innerText = this.bombs;
+	}
+}
 
-var Key;
+Player.prototype.ITEM_GLOVES = 1;
+//what other items might we want to make?
+//portal gun
+//incinerator?
+//bomb-through-walls?
+//walk-through-walls?
 
-var Money = makeClass(new (function(){
-	this.super = BaseObj;
 
-	//Player.ITEM_ ...
-	this.items = 0;
-	
-	//how many bombs this Money is holding
-	//TODO - (a) make this a bitflag? (b) remove the #'s from the drawSprite too? (c) other optional flags on the drawSprite for other items
-	this.bombs = 0;
+class Money extends BaseObj {
+	constructor(...args) {
+		super(...args);
+		
+		//Player.ITEM_ ...
+		this.items = 0;
 
-	this.init = function() {
-		Money.super.apply(this, arguments);
+		//how many bombs this Money is holding
+		//TODO - (a) make this a bitflag? (b) remove the #'s from the drawSprite too? (c) other optional flags on the drawSprite for other items
+		this.bombs = 0;
+
 		this.isBlocking = false;
 		this.setSeq(Animation.prototype.SEQ_MONEY);
 		this.gameNumbers = new GameNumbers();
-	};
-	
+	}
+
 	//money isBlocking is false, but isBlockingSentry is true
 	//this makes money the only special thing for sentries
 	//(should keys be the same?)
-	this.isBlockingSentry = function() { return true; };
+	isBlockingSentry() { return true; }
 
-	this.drawSprite = function(c, rect) {
-		Money.superProto.drawSprite.call(this, c, rect);
+	drawSprite(c, rect) {
+		super.drawSprite(c, rect);
 
-		if (this.bombs > 0) {		
+		if (this.bombs > 0) {
 			this.gameNumbers.draw(c, rect, this.bombs, this.posX, this.posY);
 		}
-	
+
 		if ((this.items & Player.prototype.ITEM_GLOVES) != 0) {
-			var gloveSeq = anim.framesForSeq[ Animation.prototype.SEQ_GLOVE ];
-			var gloveFrame = anim.frames[gloveSeq];
-			var gloveBitmap = gloveFrame.bitmap;
+			let gloveSeq = anim.framesForSeq[ Animation.prototype.SEQ_GLOVE ];
+			let gloveFrame = anim.frames[gloveSeq];
+			let gloveBitmap = gloveFrame.bitmap;
 			rect.left = (rect.left + rect.right) / 2;
 			rect.bottom = (rect.top + rect.bottom) / 2;
 			try {
 				c.drawImage( gloveBitmap, rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top);
 			} catch (e) {}
 		}
-	};
+	}
 
-	this.endPush = function(who, pushDestX, pushDestY) {
-		if (!who.isa(Player)) return;
+	endPush(who, pushDestX, pushDestY) {
+		if (!(who instanceof Player)) return;
 		if (this.linfDist(pushDestX, pushDestY, this.destPosX, this.destPosY) >= .5) return;	//too far away
 
 		{
-			var player = who;
+			let player = who;
 			player.getMoney(this);
 		}
-		
+
 		game.removeObj(this);
 
-		$.each(game.objs, function(i,o) {
-			if (o.isa(Key)) o.checkMoney();
+		game.objs.forEach(o => {
+			if (o instanceof Key) o.checkMoney();
 		});
-	};
-})());
+	}
+}
 
-Key = makeClass(new (function(){
-	this.super = BaseObj;
+class Key extends BaseObj {
+	constructor(...args) {
+		super(...args);
+		
+		this.changeLevelTime = 0;
+		//wait a frame or so between player touch and end level
+		this.touchToEndLevelDuration = 1/50;
 
-	this.changeLevelTime = 0;
-	//wait a frame or so between player touch and end level
-	this.touchToEndLevelDuration = 1/50;
+		this.inactive = true;
 
-	this.inactive = true;
-
-	this.init = function() {
-		Key.super.apply(this, arguments);
 		this.isBlocking = false;
 		this.blocksExplosion = false;
 		this.setSeq(Animation.prototype.SEQ_KEY_GREY);
-	
+
 		this.doFirstCheck = true;
-	};
-	
-	this.show = function() {
+	}
+
+	show() {
 		this.inactive = false;
 		this.setSeq(Animation.prototype.SEQ_KEY);
-	};
-	
-	this.endPush = function(who, pushDestX, pushDestY) {
-		if (!who.isa(Player)) return;
+	}
+
+	endPush(who, pushDestX, pushDestY) {
+		if (!(who instanceof Player)) return;
 		if (this.inactive) return;
 		if (this.changeLevelTime > 0) return;	//already been touched / already waiting to change level
 		if (this.linfDist(pushDestX, pushDestY, this.destPosX, this.destPosY) >= .5) return;	//too far away
@@ -1558,155 +1569,108 @@ Key = makeClass(new (function(){
 		this.changeLevelTime = game.time + this.touchToEndLevelDuration;
 
 		this.frameId = -1;	//disappear
-		
+
 		//TODO - delay? then this? that way medusas can get a shot off for sure,
 		//if in their last frame the player was shootable
-	
-		$.each(game.objs, function(_o,o) {
-			if (o.removeMe) return true;//continue;
+
+		game.objs.forEach(o => {
+			if (o.removeMe) return;//continue;
 			o.onKeyTouch();
 		});
-		
+
 		//no more bomb dropping
 		if (game.player !== undefined) {
 			game.player.setBombs(0);
 		}
-	};
-	
-	this.update = function(dt) {
-		Key.superProto.update.call(this, dt);
-		
+	}
+
+	update(dt) {
+		super.update(dt);
+
 		if (this.changeLevelTime > 0 && this.changeLevelTime < game.time) {
 			if (!game.player.dead) {
 				game.nextLevel();
 			}
 		}
-	
+
 		//check for levels with no money
 		if (this.doFirstCheck) {
 			this.doFirstCheck = false;
 			this.checkMoney();
 		}
-	};
+	}
 
-	this.checkMoney = function() {
-		var moneyleft = 0;
-		$.each(game.objs, function(_o,o) {
-			if (o.removeMe) return true;	//continue
-			if (o.isa(Money)) moneyleft++;
+	checkMoney() {
+		let moneyleft = 0;
+		game.objs.forEach(o => {
+			if (o.removeMe) return;//continue
+			if (o instanceof Money) moneyleft++;
 		});
 		if (moneyleft == 0) {
 			//throw an exception if there's no key
 			this.show();
 		}
+	}
+}
 
-	};
-})());
+let buttonSys;
 
-var Game = makeClass({
-
-	MAPTYPE_EMPTY : 0,
-	MAPTYPE_TREE : 1,
-	MAPTYPE_BRICK : 2,
-	MAPTYPE_STONE : 3,
-	MAPTYPE_WATER : 4,
-	
-	MAP_WIDTH : 10,
-	MAP_HEIGHT : 10,	//i want this to be 10... how do you hide the titlebar?
-	
-	tileBitmapIds : [
-		'ground',
-		'tree',
-		'bricks',
-		'stone',
-		'water',
-	],
-	
-	//TODO - keep this 1-1 with MAPTYPE_***
-	mapTypes : [
-		new MapType('ground', 0),
-		new MapType('tree', MapType.prototype.CANNOT_PASSTHRU | MapType.prototype.DRAW_GROUND_UNDER),
-		new MapType('bricks', MapType.prototype.CANNOT_PASSTHRU | MapType.prototype.BLOCKS_GUNSHOT | MapType.prototype.BLOCKS_EXPLOSIONS | MapType.prototype.BOMBABLE),
-		new MapType('stone', MapType.prototype.CANNOT_PASSTHRU | MapType.prototype.BLOCKS_GUNSHOT | MapType.prototype.BLOCKS_EXPLOSIONS),
-		new MapType('water', MapType.prototype.CANNOT_PASSTHRU),
-	],
-	
-	removeRequest : false,
-	
-	rect : new Rect(),
-
-	//used for fixed-rate updates
-	sysTime : 0,
-	lastSysTime : 0,
-	accruedTime : 0,
-	updateDuration : 1/50,
-	time : 0,
-
-	loadLevelRequest : false,
-	level : 0,
-	
-	//canvas size
-	width : 1,
-	height : 1,
-
-	CMD_UP : 1,
-	CMD_DOWN : 2,
-	CMD_LEFT : 4,
-	CMD_RIGHT : 8,
-	CMD_BOMB : 16,
-	cmd : 0,
-
+class Game {
 	//call Game.prototype.staticInit() on startup, once
-	staticInit : function() {
-		for (var i = 0; i < this.tileBitmapIds.length; i++) {
-			this.mapTypes[i].typeIndex = i;
-			this.mapTypes[i].bitmap = $('<img>', {src:'res/drawable/'+this.mapTypes[i].bitmapId+'.png'}).get(0);
+	static staticInit() {
+		const thiz = Game.prototype;
+		for (let i = 0; i < thiz.tileBitmapIds.length; i++) {
+			thiz.mapTypes[i].typeIndex = i;
+			thiz.mapTypes[i].bitmap = DOM('img', {src:'res/drawable/'+thiz.mapTypes[i].bitmapId+'.png'});
 		}
-	},
+	}
 
 //I should make a game gui class:
 
 	//static
-	restart : function() {
-		
+	restart() {
+
 		//this only works if it's a valid level
 		splash.start({
 			level : game ? game.level : 0,
 			levelData : !game ? undefined : game.level == -1 ? game.levelData : undefined
 		});
-	},
+	}
 
 	//static
-	skip : function() {	
+	skip() {
 		if (!game) return;
 		game.nextLevel(true);
-	},
+	}
 
 	//static
-	close : function() {
-		var returnToEditor = game && game.returnToEditor;
+	close() {
+		let returnToEditor = game && game.returnToEditor;
 		if (returnToEditor) {
 			editor.customLevelIndex = -1;
 			editor.show();
 		} else {
 			splash.show();
 		}
-	},
+	}
 
 	//static
-	gamepadToggle : function() {
-		if ($('#gamepad-checkbox').is(':checked')) {
+	gamepadToggle() {
+		if (ids.gamepad_checkbox.checked) {
 			buttonSys.show();
 		} else {
 			buttonSys.hide();
 		}
-	},
+	}
 
 //the real game class:
 
-	init : function(args) {
+	constructor(args) {
+		this.lastFPSTime = Date.now();
+		this.fpsUpdates = 0;
+
 		if (args === undefined) args = {};
-		if (args.level !== undefined && args.level !== -1) {
+		if (goodisfinite(args.level) && args.level !== -1) {
 			this.setLevel(args.level);
 		} else if (args.levelData !== undefined) {
 			this.levelData = args.levelData;
@@ -1718,35 +1682,35 @@ var Game = makeClass({
 		this.frozen = args.frozen;
 		this.returnToEditor = args.returnToEditor;
 		if (!args.dontResize) {
-			requestAnimFrame(onresize);	//resize the game's canvas
+			requestAnimationFrame(onresize);	//resize the game's canvas
 		}
 
 		//hudPaint.setStyle(Paint.Style.FILL);
 		//hudPaint.setColor(android.graphics.Color.WHITE);
-		
+
 		//hudShadow.setStyle(Paint.Style.STROKE);
 		//hudShadow.setColor(android.graphics.Color.BLACK);
 		//hudShadow.setStrokeWidth(4);
-		
+
 		//blackPaint.setStyle(Paint.Style.FILL);
 		//blackPaint.setColor(android.graphics.Color.BLACK);
-		
+
 		this.sysTime = this.lastSysTime = Date.now();
-		
+
 		//TODO - read in tile types from some source
 		this.tiles = [];//new MapType[MAP_WIDTH][];
-		for (var i = 0; i < this.MAP_WIDTH; i++) {
+		for (let i = 0; i < this.MAP_WIDTH; i++) {
 			this.tiles[i] = [];//new MapType[MAP_HEIGHT];
-			for (var j = 0; j < this.MAP_HEIGHT; j++) {
+			for (let j = 0; j < this.MAP_HEIGHT; j++) {
 				this.tiles[i][j] = this.mapTypes[this.MAPTYPE_EMPTY];// (int)(Math.random() * mapTypes.length) ];
 			}
 		}
-		
-		this.bitmapButtonBomb = $('<img>', {src:'res/drawable/button_bomb.png'}).get(0);
-		
+
+		this.bitmapButtonBomb = DOM('img', {src:'res/drawable/button_bomb.png'});
+
 		//don't load the level just yet
 		//first give the obj we are given to (i.e. the activity?) a chance to change the level or what not
-		//(or move that into a var in the ctor)
+		//(or move that into a let in the ctor)
 		//and then call loadLevel in init()
 
 		this.removeAll();	//and inits the objs and addObjs member arrays
@@ -1757,48 +1721,50 @@ var Game = makeClass({
 			//and all it had in it was this:
 			this.loadLevel();
 		}
-	},
+	}
 
-	nextLevel : function(dontComplete) {
-		if (!dontComplete) setCookie('completed'+this.level, '1', 9999);
+	nextLevel(dontComplete) {
+		if (!dontComplete) localStorage.setItem('completed'+this.level, '1');
 		if (this.level != -1) {
 			this.setLevel(this.level+1);
 		}
 		this.loadLevelRequest = true;
-	},
+	}
 
-	setLevel : function(level) {
+	setLevel(level) {
+//console.log('setLevel', level);		
 		this.level = level;
 		if (this.level != -1) {
-			setCookie('level', this.level, 9999);
-			$('#game-hud-level').text(this.level);
+			localStorage.setItem('level', this.level);
+			ids.game_hud_level.innerText = this.level;
 		} else {
-			$('#game-hud-level').text('?');
+			ids.game_hud_level.innerText = '?';
 		}
-	},
-	
-	loadLevel : function() {
+	}
+
+	loadLevel() {
 		this.removeAll();
-		
-	//	try 
+
+	//	try
 		{
-			var levelData = undefined;
+			let levelData = undefined;
 			if (this.level !== -1) {
+//console.log('this.level', this.level, levelDB[this.level]);				
 				levelData = levelDB[this.level].tiles;
 			} else if (this.levelData !== undefined) {
 				levelData = this.levelData;
 			}
 			if (levelData === undefined) throw "failed to find any level data";
 this.levelData = levelData;
-		
+
 			if (typeof(levelData) == 'string') {
-				var tileIndex = 0;
-				for (var y = 0 ; y < this.MAP_HEIGHT; y++) {
-					for (var x = 0; x < this.MAP_WIDTH; x++, tileIndex++) {
-						var posX = x + .5;
-						var posY = y + .5;
-						var ch = levelData.charAt(2*tileIndex);
-						var ch2 = levelData.charAt(2*tileIndex+1);
+				let tileIndex = 0;
+				for (let y = 0 ; y < this.MAP_HEIGHT; y++) {
+					for (let x = 0; x < this.MAP_WIDTH; x++, tileIndex++) {
+						let posX = x + .5;
+						let posY = y + .5;
+						let ch = levelData.charAt(2*tileIndex);
+						let ch2 = levelData.charAt(2*tileIndex+1);
 						this.tiles[x][y] = this.mapTypes[this.MAPTYPE_EMPTY];
 						if (ch == '*') {
 							this.tiles[x][y] = this.mapTypes[this.MAPTYPE_BRICK];
@@ -1813,30 +1779,30 @@ this.levelData = levelData;
 							this.player.setPos(posX, posY);
 							this.objs.push(this.player);
 						} else if (ch == 'M') {
-							var money = new Money();
+							let money = new Money();
 							money.setPos(posX, posY);
 							if (ch2 >= '0' && ch2 <= '9') money.bombs = ch2 - '0';
 							if (ch2 == 'G') money.items = Player.prototype.ITEM_GLOVES;
 							this.objs.push(money);
 						} else if (ch == 'K') {
-							var key = new Key();
+							let key = new Key();
 							key.setPos(posX, posY);
 							this.objs.push(key);
 						} else if (ch == 'B') {
-							var bomb = new Bomb();
+							let bomb = new Bomb();
 							bomb.setPos(posX, posY);
 							if (ch2 >= '0' && ch2 <= '9') bomb.blastRadius = ch2 - '0';
 							this.objs.push(bomb);
 						} else if (ch == 'F') {
-							var framer = new Framer();
+							let framer = new Framer();
 							framer.setPos(posX, posY);
 							this.objs.push(framer);
 						} else if (ch == 'G') {
-							var gun = new Gun();
+							let gun = new Gun();
 							gun.setPos(posX, posY);
 							this.objs.push(gun);
 						} else if (ch == 'S') {
-							var sentry = new Sentry();
+							let sentry = new Sentry();
 							sentry.setPos(posX, posY);
 							this.objs.push(sentry);
 						} else if (ch == '.') {	//empty
@@ -1849,74 +1815,74 @@ this.levelData = levelData;
 				console.log(levelData);
 				throw "got bad level data";
 /*					// interpret as a json encoded level
-				var tileObj = levelData;
-				var tileIndex = 0;
+				let tileObj = levelData;
+				let tileIndex = 0;
 				console.log("reading tiles...");
-				for (var y = 0; y < this.MAP_HEIGHT; y++) {
-					for (var x = 0; x < this.MAP_WIDTH; x++, tileIndex++) {
-						var tileTypeIndex = (tileObj.tileIndex);
+				for (let y = 0; y < this.MAP_HEIGHT; y++) {
+					for (let x = 0; x < this.MAP_WIDTH; x++, tileIndex++) {
+						let tileTypeIndex = (tileObj.tileIndex);
 						if (tileTypeIndex < 0 || tileTypeIndex >= this.mapTypes.length) {
 							throw ("got a bad tile type: " + tileTypeIndex);
 						}
 						this.tiles[x][y] = this.mapTypes[tileTypeIndex];
 					}
 				}
-				
+
 				console.log("reading ents...");
-				var ents = JSON.stringify("ents");
+				let ents = JSON.stringify("ents");
 				console.log("total number of ents: " + ents.length);
-				for (var i = 0; i < ents.length(); i++) {
-					var ent = ents[i];
-					var classname = ent["class"];
-					var posX = parseFloat(ent.x);
-					var posY = parseFloat(ent.y);
-					
+				for (let i = 0; i < ents.length(); i++) {
+					let ent = ents[i];
+					let classname = ent["class"];
+					let posX = parseFloat(ent.x);
+					let posY = parseFloat(ent.y);
+
 					console.log("reading an ent " + classname + " at " + posX + " " + posY);
-					
+
 					if (classname == "Player") {
 						this.player = new Player();
 						this.player.setPos(posX,posY);
 						this.objs.push(player);
 					} else if (classname == "Money") {
-						var money = new Money();
+						let money = new Money();
 						money.setPos(posX,posY);
 						if (ent.bombs !== undefined) money.bombs = (ent.bombs);
 						this.objs.push(money);
 					} else if (classname == "Key") {
-						var key = new Key();
+						let key = new Key();
 						key.setPos(posX,posY);
 						this.objs.push(key);
 					} else if (classname == "Bomb") {
-						var bomb = new Bomb();
+						let bomb = new Bomb();
 						bomb.setPos(posX,posY);
 						if (ent.time !== undefined) bomb.setFuse((ent.time));
 						if (ent.radius !== undefined) bomb.blastRadius = (ent.radius);
 						this.objs.push(bomb);
 					} else if (classname == "Framer") {
-						var framer = new Framer();
+						let framer = new Framer();
 						framer.setPos(posX,posY);
 						this.objs.push(framer);
 					} else {
 						throw ("tried to load an unknown class: " + classname);
 					}
 				}
-*/			
+*/
 			}
 	//	} catch (e) {
 	//		console.warning("Loading level failed: " + e + " msg:" + e.getMessage());
 	//		throw;
 		}
-	},
-	
-	update : function() {
+	}
+
+	update() {
 		//editor freezes games
 		if (this.frozen) return;
-		
+
 		this.lastSysTime = this.sysTime;
 		this.sysTime = Date.now();
-		var deltaTime = this.sysTime - this.lastSysTime;
+		let deltaTime = this.sysTime - this.lastSysTime;
 		this.accruedTime += deltaTime/1000;
-		
+
 		if (this.player) {
 			if ((this.cmd & this.CMD_UP) != 0) {
 				this.player.move(Dir.UP);
@@ -1929,11 +1895,11 @@ this.levelData = levelData;
 			} else {
 				this.player.stopMoving();
 			}
-		
+
 			//not exclusive to the above
 			if ((this.cmd & this.CMD_BOMB) != 0) {
 				this.player.beginDropBomb();
-			} else {	
+			} else {
 				this.player.endDropBombs();
 			}
 		}
@@ -1941,42 +1907,42 @@ this.levelData = levelData;
 		while (this.accruedTime > this.updateDuration) {
 			this.accruedTime -= this.updateDuration;
 			this.time += this.updateDuration;
-		
+
 			//do game update here
 
-			var thiz = this;
-			$.each(this.objs, function(_o,o) {
-				if (o.removeMe) return true;	//continue
+			let thiz = this;
+			this.objs.forEach(o => {
+				if (o.removeMe) return;//continue
 				o.update(thiz.updateDuration);
 			});
-			
+
 			// ... only one update at most
 			this.accruedTime = 0;
 			break;
 		}
-		
+
 		if (this.player && this.player.dead && this.player.deadTime < this.time) {
 			this.loadLevel();	//set the request
 		}
-		
+
 		if (this.removeRequest) {
-			for (var i = this.objs.length-1; i >= 0; i--) {
-				var o = this.objs[i];
+			for (let i = this.objs.length-1; i >= 0; i--) {
+				let o = this.objs[i];
 				if (o.removeMe) {
 					this.objs.splice(i, 1);
 				}
 			}
 			this.removeRequest = false;
 		}
-		
+
 		if (this.addList.length > 0) {
 			this.objs = this.objs.concat(this.addList);
 			this.addList = [];
 		}
-		
+
 		if (this.loadLevelRequest) {
 			this.loadLevelRequest = false;
-			
+
 	//		if (level >= Levels.levels.length) {
 	//			//then end the game
 	//			g.endGame();
@@ -1987,23 +1953,16 @@ this.levelData = levelData;
 			this.level %= levelDB.length;
 			this.loadLevel();
 		}
-	},
+	}
 
-	setFontSize : function(fontSize) {
+	setFontSize(fontSize) {
 		if (fontSize === this.fontSize) return;
 		this.fontSize = fontSize;
-		$('#game-stats').css({fontSize:fontSize});
-	},
+		ids['game-stats'].style.fontSize=fontSize;
+	}
 
-	lastFPSTime : Date.now(),
-	fpsUpdates : 0,
-	
-	//was constant ... because
-	TILE_WIDTH : 24,
-	TILE_HEIGHT : 24,
-
-	draw : function() {
-		var c = this.canvas.getContext('2d');
+	draw() {
+		let c = this.canvas.getContext('2d');
 
 //		long thisFPSTime = System.currentTimeMillis();
 //		fpsUpdates++;
@@ -2013,8 +1972,8 @@ this.levelData = levelData;
 //			lastFPSTime = thisFPSTime;
 //			fpsUpdates = 0;
 //		}
-	
-	
+
+
 		this.width = game.canvas.width;//c.getWidth();
 		this.height = game.canvas.height;//c.getHeight();
 		this.TILE_HEIGHT = this.height / this.MAP_HEIGHT;
@@ -2028,38 +1987,38 @@ this.levelData = levelData;
 //		rectBomb.set(0, height/8, width - MAP_WIDTH * TILE_WIDTH, height*3/8);	//l,t,r,b
 //		rectDpad.set(0, height/2, width - MAP_WIDTH * TILE_WIDTH, height);
 
-		for (var i = 0; i < this.MAP_WIDTH; i++) {
-			for (var j = 0; j < this.MAP_HEIGHT; j++) {
-				var t = this.tiles[i][j];
-				var paddingX = this.width - this.MAP_WIDTH * this.TILE_WIDTH;
+		for (let i = 0; i < this.MAP_WIDTH; i++) {
+			for (let j = 0; j < this.MAP_HEIGHT; j++) {
+				let t = this.tiles[i][j];
+				let paddingX = this.width - this.MAP_WIDTH * this.TILE_WIDTH;
 				this.rect.left = i * this.TILE_WIDTH + paddingX;
 				this.rect.right = this.rect.left + this.TILE_WIDTH;
 				this.rect.top = j * this.TILE_HEIGHT;
 				this.rect.bottom = this.rect.top + this.TILE_HEIGHT;
 				//c.drawBitmap(t.bitmap, i * TILE_WIDTH, j * TILE_HEIGHT, undefined);
-				
+
 				if ((t.flags & MapType.prototype.DRAW_GROUND_UNDER) != 0) {
 					try {
-						c.drawImage(this.mapTypes[this.MAPTYPE_EMPTY].bitmap, 
+						c.drawImage(this.mapTypes[this.MAPTYPE_EMPTY].bitmap,
 							this.rect.left, this.rect.top, this.rect.right - this.rect.left, this.rect.bottom - this.rect.top
 						);
 					} catch (e) {}
 				}
-		
+
 				try {
-					c.drawImage(t.bitmap, 
+					c.drawImage(t.bitmap,
 						this.rect.left, this.rect.top, this.rect.right - this.rect.left, this.rect.bottom - this.rect.top
 					);
 				} catch (e) {}
 			}
 		}
-		
+
 		//draw player
-		var thiz = this;
-		$.each(this.objs, function(_o,o) {
+		let thiz = this;
+		this.objs.forEach(o => {
 			o.drawSprite(c, thiz.rect);
 		});
-		
+
 		//black
 		this.rect.top = 0;
 		this.rect.bottom = this.height;
@@ -2069,186 +2028,258 @@ this.levelData = levelData;
 		c.fillRect(
 			this.rect.left, this.rect.top, this.rect.right - this.rect.left, this.rect.bottom - this.rect.top
 		);
-	},
+	}
 
-	getMapType : function(ix, iy) {
+	getMapType(ix, iy) {
 		ix = parseInt(ix);
 		iy = parseInt(iy);
 		if (ix < 0 || iy < 0 || ix >= this.MAP_WIDTH || iy >= this.MAP_HEIGHT) return this.mapTypes[this.MAPTYPE_OOB];
 		return this.tiles[ix][iy];
-	},
+	}
 	
-	getMapTypeIndex : function(ix, iy) {
+	getMapTypeIndex(ix, iy) {
 		ix = parseInt(ix);
 		iy = parseInt(iy);
 		if (ix < 0 || iy < 0 || ix >= this.MAP_WIDTH || iy >= this.MAP_HEIGHT) return this.MAPTYPE_OOB;
 		return this.tiles[ix][iy].typeIndex;
-	},
-	
-	setMapTypeIndex : function(ix, iy, type) {
+	}
+
+	setMapTypeIndex(ix, iy, type) {
 		ix = parseInt(ix);
 		iy = parseInt(iy);
 		if (ix < 0 || iy < 0 || ix >= this.MAP_WIDTH || iy >= this.MAP_HEIGHT) return false;
 		this.tiles[ix][iy] = this.mapTypes[type];
 		return true;
-	},
+	}
 
-	removeAll : function() {
+	removeAll() {
 		//remove objs individually -- so they can detach dom elems and what not
 		if (this.objs !== undefined) {
-			$.each(this.objs, function(_o,o) {
+			this.objs.forEach(o => {
 				o.onRemove();
 			});
 		}
 		this.objs = [];//new LinkedList<BaseObj>();
 		this.addList = [];//new LinkedList<BaseObj>();
-	},
+	}
 
-	removeObj : function(o) {
+	removeObj(o) {
 		o.onRemove();
 		this.removeRequest = true;
-	},
-	
-	addObj : function(o) {
+	}
+
+	addObj(o) {
 		this.addList.push(o);
-	},
-	
-	restartLevel : function() {
+	}
+
+	restartLevel() {
 		this.player.die();
 	}
-});
+}
+
+Game.prototype.MAPTYPE_EMPTY = 0;
+Game.prototype.MAPTYPE_TREE = 1;
+Game.prototype.MAPTYPE_BRICK = 2;
+Game.prototype.MAPTYPE_STONE = 3;
+Game.prototype.MAPTYPE_WATER = 4;
+
+Game.prototype.MAP_WIDTH = 10;
+Game.prototype.MAP_HEIGHT = 10;	//i want this to be 10... how do you hide the titlebar?
+
+Game.prototype.tileBitmapIds = [
+	'ground',
+	'tree',
+	'bricks',
+	'stone',
+	'water',
+];
+
+//TODO - keep this 1-1 with MAPTYPE_***
+Game.prototype.mapTypes = [
+	new MapType('ground', 0),
+	new MapType('tree', MapType.prototype.CANNOT_PASSTHRU | MapType.prototype.DRAW_GROUND_UNDER),
+	new MapType('bricks', MapType.prototype.CANNOT_PASSTHRU | MapType.prototype.BLOCKS_GUNSHOT | MapType.prototype.BLOCKS_EXPLOSIONS | MapType.prototype.BOMBABLE),
+	new MapType('stone', MapType.prototype.CANNOT_PASSTHRU | MapType.prototype.BLOCKS_GUNSHOT | MapType.prototype.BLOCKS_EXPLOSIONS),
+	new MapType('water', MapType.prototype.CANNOT_PASSTHRU),
+];
+
+Game.prototype.removeRequest = false;
+
+Game.prototype.rect = new Rect();
+
+//used for fixed-rate updates
+Game.prototype.sysTime = 0;
+Game.prototype.lastSysTime = 0;
+Game.prototype.accruedTime = 0;
+Game.prototype.updateDuration = 1/50;
+Game.prototype.time = 0;
+
+Game.prototype.loadLevelRequest = false;
+Game.prototype.level = 0;
+
+//canvas size
+Game.prototype.width = 1;
+Game.prototype.height = 1;
+
+Game.prototype.CMD_UP = 1;
+Game.prototype.CMD_DOWN = 2;
+Game.prototype.CMD_LEFT = 4;
+Game.prototype.CMD_RIGHT = 8;
+Game.prototype.CMD_BOMB = 16;
+Game.prototype.cmd = 0;
+
+//was constant ... because
+Game.prototype.TILE_WIDTH = 24;
+Game.prototype.TILE_HEIGHT = 24;
+
+
+
+
 //self-referencing initial values.  i could do new (function({})() rather than {} to allow this in-place...
 //out of bound tiles are considered...
 Game.prototype.MAPTYPE_OOB = Game.prototype.MAPTYPE_STONE;
 
 function refreshLevels(done) {
-	$.getJSON('levels.json')
-	.fail(function(){
+	fetch('levels.json')
+	.then(response => {
+		if (!response.ok) return Promise.reject('not ok');
+		response.json()
+		.then(d => {
+			levelDB = d.levels;
+			if (done) done();
+		});
+	})
+	.catch(e => {
 		alert('failed to load levels!');
-	}).done(function(d){
-		levelDB = d.levels;
-		if (done) done();
 	});
 }
 
 function refreshUserLevels(done) {
-	thisUserLevelDB = getCookie('thisUserLevelDB') || undefined;
+	thisUserLevelDB = localStorage.getItem('thisUserLevelDB') || undefined;
 	if (thisUserLevelDB !== undefined) {
-		thisUserLevelDB = $.parseJSON(thisUserLevelDB);
+		thisUserLevelDB = JSON.parse(thisUserLevelDB);
 	} else {
 		thisUserLevelDB = [];
 	}
 
-	$.getJSON('userlevels.json')
-	.fail(function(){
+	fetch('userlevels.json')
+	.then(response => {
+		if (!response.ok) return Promise.reject('not ok');
+		response.json()
+		.then(d => {
+			allUsersLevelDB = d.levels;
+		});
+	}).catch(e =>{
 		console.log('failed to load user levels!');
-	}).done(function(d){
-		allUsersLevelDB = d.levels;
-	}).always(function(){
+	})
+	.finally(() => {
 		if (done) done();
 	});
 }
 
 function saveUserLevels() {
 	if (thisUserLevelDB !== undefined && thisUserLevelDB.length > 0) {
-		setCookie('thisUserLevelDB', JSON.stringify(thisUserLevelDB), 9999);
+		localStorage.setItem('thisUserLevelDB', JSON.stringify(thisUserLevelDB));
 	} else {
-		clearCookie('thisUserLevelDB');
+		localStorage.removeItem('thisUserLevelDB');
 	}
 }
 
-var Splash = makeClass({
-	show : function() {
+class Splash {
+	show() {
 		clearGame();
 		buttonSys.hide();
-		$.mobile.changePage('#splash-page');
-	},
-	start : function(args) {
+		changePage('splash-page');
+	}
+	start(args) {
 		clearGame();
 		if (args === undefined) args = {};
 		if (args.level === undefined) {
-			args.level = parseInt(getCookie('level'));
-			if (args.level != args.level) args.level = undefined;	//stupid javascript says parseint on bad values is NaN ...
+			args.level = parseInt(localStorage.getItem('level'));
+			if (!goodisfinite(args.level)) args.level = undefined;	//stupid javascript says parseint on bad values is NaN ...
 		}
 		if (args.level === undefined) {
 			args.level = 0;
 		}
-		refreshLevels(function(){
-			args.canvas = $('#game-canvas').get(0);
+		refreshLevels(() => {
+			args.canvas = ids['game-canvas'];
 			game = new Game(args);
-			$('#dropdown').hide();
-			$.mobile.changePage('#game-page');
+			hide(ids.dropdown);
+			changePage('game-page');
 		});
 		//refresh gamepad
 		Game.prototype.gamepadToggle();
 	}
-});
+}
 
-var ChooseLevels = makeClass({
-	show : function() {
+class ChooseLevels {
+	show() {
 		buttonSys.hide();
-		$.mobile.changePage('#level-page');
+		changePage('level-page');
 		this.refresh();
-	},
-	refresh : function(done) {
-		var thiz = this;
-		$('#level-page-content').empty();
-		refreshLevels(function() {
-			refreshUserLevels(function() {
-				var dbs = [levelDB];	//better be there
+	}
+	refresh(done) {
+		let thiz = this;
+		ids['level-page-content'].innerHTML = '';
+		refreshLevels(() => {
+			refreshUserLevels(() => {
+				let dbs = [levelDB];	//better be there
 				if (thisUserLevelDB !== undefined && thisUserLevelDB.length > 0) dbs.push(thisUserLevelDB);	//might be there
 				if (allUsersLevelDB !== undefined && allUsersLevelDB.length > 0) dbs.push(allUsersLevelDB);	//might be there
-				$.each(dbs, function(_db,db) { 
-					
+				dbs.forEach(db => {
+
 					if (db == allUsersLevelDB && db.length > 0) {
-						$('<br>').appendTo($('#level-page-content'));
-						$('<br>').appendTo($('#level-page-content'));
-						$('<div>', {text:'User Submitted Levels:'}).appendTo($('#level-page-content'));
+						DOM('br', {appendTo:ids['level-page-content']});
+						DOM('br', {appendTo:ids['level-page-content']});
+						DOM('div', {text:'User Submitted Levels:', appendTo:ids['level-page-content']});
 					} else if (db == thisUserLevelDB && db.length > 0) {
-						$('<br>').appendTo($('#level-page-content'));
-						$('<br>').appendTo($('#level-page-content'));
-						$('<div>', {text:'Your Levels:'}).appendTo($('#level-page-content'));
+						DOM('br', {appendTo:ids['level-page-content']});
+						DOM('br', {appendTo:ids['level-page-content']});
+						DOM('div', {text:'Your Levels:', appendTo:ids['level-page-content']});
 					}
-				
-					$.each(db, function(i, levelData) {
-						var levelNumber = i;
+
+					db.forEach((levelData, i) => {
+						let levelNumber = i;
 						if (db !== levelDB) levelNumber = -1;
 						//set canvas global
-						var chooseCanvas = $('<canvas>', {
+						let chooseCanvas = DOM('canvas', {
 							css : {
 								padding:'10px',
 								cursor:'pointer'
 							},
-							click : function() {
+							click : e => {
 								console.log(levelNumber, levelData.tiles);
 								splash.start({
 									level:levelNumber,
 									levelData:levelData.tiles
 								});
-							}
-						}).attr('width', '200')
-							.attr('height', '200')
-							.appendTo($('#level-page-content'))
-							.get(0);
-						
+							},
+							attrs : {
+								width : 200,
+								height : 200,
+							},
+							appendTo : ids['level-page-content'],
+						});
+
 						if (db == thisUserLevelDB) {
-							$('<img>', {
+							DOM('img', {
 								src : 'images/cross.png',
 								css : {
 									verticalAlign:'top',
 									cursor:'pointer'
 								},
-								click : function() {
+								click : e => {
 									thisUserLevelDB.splice(i,1);
 									saveUserLevels();
-									var t = document.body.scrollTop;
+									let t = document.body.scrollTop;
 									thiz.refresh(function() {
 										document.body.scrollTop = t;
 									});
-								}
-							}).appendTo($('#level-page-content'));
+								},
+								appendTo:ids['level-page-content'],
+							});
 
-							$('<img>', {
+							DOM('img', {
 								src : 'images/pencil.png',
 								css : {
 									cursor:'pointer',
@@ -2258,11 +2289,12 @@ var ChooseLevels = makeClass({
 									editor.levelData = levelData.tiles;
 									editor.customLevelIndex = i;
 									editor.show();
-								}
-							}).appendTo($('#level-page-content'));
-						
+								},
+								appendTo:ids['level-page-content'],
+							});
+
 						}
-					
+
 						//and now do a single draw...
 						game = new Game({
 							frozen:true,
@@ -2272,27 +2304,27 @@ var ChooseLevels = makeClass({
 						});
 						game.draw();
 						game.removeAll();
-					
-						if (db == levelDB && getCookie('completed'+i) == '1') {
-							var c = chooseCanvas.getContext('2d');
+
+						if (db == levelDB && localStorage.getItem('completed'+i) == '1') {
+							let c = chooseCanvas.getContext('2d');
 							c.globalAlpha = .5;
 							c.fillStyle = '#fff';
 							c.fillRect(0,0,game.canvas.width,game.canvas.height);
 							c.globalAlpha = 1;
 						}
 					});
-				
+
 				});
 				game = undefined;
 				if (done) done();
 			});
 		});
 	}
-});
+}
 
 function showHelp() {
 	buttonSys.hide();
-	$.mobile.changePage('#help-page');
+	changePage('help-page');
 }
 
 function clearGame() {
@@ -2301,36 +2333,36 @@ function clearGame() {
 	game = undefined;
 }
 
-var Editor = makeClass(new (function(){
-	this.init = function() {
-		var text = Array(Game.prototype.MAP_HEIGHT+1).join(
+class Editor {
+	constructor() {
+		let text = Array(Game.prototype.MAP_HEIGHT+1).join(
 			Array(2*Game.prototype.MAP_WIDTH+1).join('.')
 		);
-		//$('#editor-textarea').val(text);
+		//ids['editor-textarea'].value = text;
 		this.customLevelIndex = -1;
 		this.levelData = text;
-	};
-	this.show = function() {
+	}
+	show() {
 		this.refresh();
 		buttonSys.hide();
-		$.mobile.changePage('#editor-page');
-	};
-	this.refresh = function() {
+		changePage('editor-page');
+	}
+	refresh() {
 		clearGame();
 		game = new Game({
 			frozen:true,
 			levelData:this.levelData,
-			canvas:$('#editor-canvas').get(0)
+			canvas:ids['editor-canvas'],
 		});
-	};
-	this.play = function() {
+	}
+	play() {
 		splash.start({
 			level:-1,
 			levelData:this.levelData,
 			returnToEditor:true
 		});
-	};
-	this.edit = function() {
+	}
+	edit() {
 		if (game) {
 			if (game.level !== -1) this.customLevelIndex = -1;
 			this.levelData = game.levelData;
@@ -2338,58 +2370,54 @@ var Editor = makeClass(new (function(){
 			this.init();
 		}
 		this.show();
-	};
-	this.save = function() {
+	}
+	save() {
 		//if we have a current entry in the user levels then replace it...
 		console.log("saving custom index",this.customLevelIndex);
 		if (this.customLevelIndex !== -1) {
 			assert(this.customLevelIndex >= 0 && this.customLevelIndex < thisUserLevelDB.length);
 			thisUserLevelDB[this.customLevelIndex] = {tiles:this.levelData};
 		} else {
-			this.customLevelIndex = thisUserLevelDB.length; 
+			this.customLevelIndex = thisUserLevelDB.length;
 			thisUserLevelDB.push({tiles:this.levelData});
 		}
 		saveUserLevels();
-	};
-	this.submit = function() {
-		var name = prompt('whats your name?');
+	}
+	submit() {
+		let name = prompt('whats your name?');
 		if (!name) return;
-		$.ajax({
-			url:'submit.js.lua',
-			method:'GET',
-			dataType:'json',
+		fetch('submit.lua', {
 			data:{
 				name:name,
-				tiles:this.levelData//$('#editor-textarea').val()
-			}
-		})
-		// jquery is always interpreting this as a fail, even if it gets a json win message back
+				tiles:this.levelData//ids['editor-textarea'].value,
+			},
+		});
+		/* jquery is always interpreting this as a fail, even if it gets a json win message back
 		.done(function() {
 			console.log('submit.lua done', arguments);
 			//alert('win');
 		}).fail(function() {
-			console.log('submit.lua fail', arguments);
-			//alert('something went terribly wrong');
-		});
-	};
-})());
+			alert('something went terribly wrong');
+		})*/;
+	}
+}
 
 //main
-var game;
-var levelDB = [];
-var allUsersLevelDB = [];
-var thisUserLevelDB = [];
-var anim;
-var splash = new Splash();
-var chooseLevels = new ChooseLevels();
-var editor = new Editor();
+let game;
+let levelDB = [];
+let allUsersLevelDB = [];
+let thisUserLevelDB = [];
+let anim;
+const splash = new Splash();
+const chooseLevels = new ChooseLevels();
+const editor = new Editor();
 
 function onresize() {
 	buttonSys.onresize();
-	var width = $(window).width();
-	var height = $(window).height();
-	var screenWidth = width - 50;
-	var screenHeight = height - 50;	//make room for ad 
+	let width = window.innerWidth;
+	let height = window.innerHeight;
+	let screenWidth = width - 50;
+	let screenHeight = height - 50;	//make room for ad
 	//resize by the smallest of the two constraints
 	if (screenWidth > screenHeight) {
 		screenWidth = screenHeight;
@@ -2397,7 +2425,7 @@ function onresize() {
 		screenHeight = screenWidth;
 	}
 	if (game) {
-		var canvas = game.canvas;
+		let canvas = game.canvas;
 		canvas.width = parseInt(screenWidth);
 		canvas.height = parseInt(screenHeight);
 		canvas.style.left = (Math.max(0, parseInt(width-screenWidth)/2))+'px';
@@ -2411,8 +2439,8 @@ function update() {
 		game.update();
 		game.draw();
 	}
-	
-	requestAnimFrame(update);
+
+	requestAnimationFrame(update);
 }
 
 
@@ -2465,9 +2493,9 @@ function handleButtonCommand(cmd, press) {
 }
 
 function onkeydown(event) {
-	if ($.mobile.activePage.get(0).id == 'game-page') { 
+	if (activePage == ids['game-page']) {
 		if (!game) return;
-		var keyCode = event.keyCode;
+		let keyCode = event.keyCode;
 		switch (keyCode) {
 		case 73:	//'i'
 		case 38:	//up
@@ -2500,22 +2528,22 @@ function onkeydown(event) {
 			return;	//...and don't prevent default
 		}
 		event.preventDefault();
-	} else if ($.mobile.activePage.get(0).id == 'editor-page') {
-		var keyCode = event.keyCode;
-		var editorKeys = {
+	} else if (activePage == ids['editor-page']) {
+		let keyCode = event.keyCode;
+		let editorKeys = {
 			'.' : '..',
 			'*' : '**',
 			'#' : '##',
 			'=' : '=='
 		};
-		$('#editor-select').val(editorKeys[String.fromCharCode(keyCode)] || '..');
+		ids['editor-select'].value = editorKeys[String.fromCharCode(keyCode)] || '..';
 	}
 }
 
 function onkeyup(event) {
-	if ($.mobile.activePage.get(0).id != 'game-page') return;
+	if (activePage != ids['game-page']) return;
 	if (!game) return;
-	var keyCode = event.keyCode;
+	let keyCode = event.keyCode;
 	switch (keyCode) {
 	case 73:	//'i'
 	case 38:	//up
@@ -2544,139 +2572,16 @@ function onkeyup(event) {
 }
 
 function onkeypress(event) {
-	if ($.mobile.activePage.get(0).id != 'game-page') return;
+	if (activePage != ids['game-page']) return;
 	event.preventDefault();
 }
 
-$(document).ready(function(){
-
-	/*
-	canvas = $('#game-canvas');
-	canvas.disableSelection();
-	glutil = new GLUtil({canvas:canvas.get(0)});
-	gl = glutil.context;
-	*/
-
-	$(window).resize(onresize);
-	Game.prototype.staticInit();
-	GameNumbers.prototype.staticInit();
-	
-	var fontSize = 24;
-	var buttonBorder = [.02, .04];
-	var buttonSeparation = [.005, .01];
-	var buttonSize = [.1, .2];
-	buttonSys.init({
-		fontSize : fontSize,
-		callback : handleButtonCommand,
-		buttons : [
-			{
-				cmd:'left',
-				url:'icons/left.png',
-				bbox:new box2({
-					min:{x:buttonBorder[0], y:1-buttonBorder[1]-buttonSize[1]},
-					max:{x:buttonBorder[0]+buttonSize[0], y:1-buttonBorder[1]}
-				})
-			},
-			{
-				cmd:'down',
-				url:'icons/down.png',
-				bbox:new box2({
-					min:{x:buttonBorder[0]+buttonSize[0]+buttonSeparation[0], y:1-buttonBorder[1]-buttonSize[1]},
-					max:{x:buttonBorder[0]+2*buttonSize[0]+buttonSeparation[0], y:1-buttonBorder[1]}
-				})
-			},
-			{
-				cmd:'up',
-				url:'icons/up.png',
-				bbox:new box2({
-					min:{x:buttonBorder[0]+buttonSize[0]+buttonSeparation[0], y:1-buttonBorder[1]-buttonSize[1]*2-buttonSeparation[1]},
-					max:{x:buttonBorder[0]+2*buttonSize[0]+buttonSeparation[0], y:1-buttonBorder[1]-buttonSize[1]-buttonSeparation[1]}
-				})
-			},
-			{
-				cmd:'right',
-				url:'icons/right.png',
-				bbox:new box2({
-					min:{x:buttonBorder[0]+buttonSize[0]*2+buttonSeparation[0]*2, y:1-buttonBorder[1]-buttonSize[1]},
-					max:{x:buttonBorder[0]+3*buttonSize[0]+buttonSeparation[0]*2, y:1-buttonBorder[1]}
-				})
-			},
-			{
-				cmd:'fire',
-				url:'icons/ok.png',
-				bbox:new box2({
-					min:{x:1-buttonBorder[0]-buttonSize[0], y:1-buttonBorder[1]-buttonSize[1]},
-					max:{x:1-buttonBorder[0], y:1-buttonBorder[1]}
-				})
-			}
-		]
-	});
-	
-	$(window)
-		.keydown(onkeydown)
-		.keyup(onkeyup)
-		.keypress(onkeypress)
-		.disableSelection();
-
-	$('#editor-page').mousedown(editorMouseEventHandler);
-	$('#editor-page').mousemove(editorMouseEventHandler);
-	$('#editor-page').mouseup(editorMouseEventHandler);
-
-	//init globals
-	anim = new Animation();
-	
-	//preload images
-	var imgs = [];
-	//tiles
-	$.each(Game.prototype.mapTypes, function(i,mapType) {
-		imgs.push(mapType.bitmap.src);
-	});
-	//frames
-	$.each(Animation.prototype.frames, function(i,frame) {
-		imgs.push(frame.bitmap.src);
-	});
-	//numbers
-	$.each(GameNumbers.prototype.bitmaps, function(i,bitmap) {
-		imgs.push(bitmap.src);
-	});
-	//preload
-	$(imgs).preload(function(){	
-		//now make gl textures for all images
-		/*
-		$.each(imgs, function(i,img) {
-			img.tex = new glutil.Texture2D({
-				flipY : false,
-				dontPremultiplyAlpha : true,
-				data : img,
-				minFilter : gl.LINEAR,
-				magFilter : gl.LINEAR,
-				generateMipmap : true
-			});
-		});
-		*/
-
-		//if get params have a level, then just play it
-		var level = $.url().param('level');
-		if (level !== undefined) {
-			splash.start({level:parseInt(level)});
-		} else {
-			//otherwise, splash screen
-			splash.show();
-		}
-	}, function(percent) {
-		$('#loading').attr('value', parseInt(100*percent));
-	});
-	
-	update();
-});
-
-
 function editorHandleScreenEvent(event, press) {
-	if ($.mobile.activePage.get(0).id == 'editor-page') {
+	if (activePage == ids['editor-page']) {
 		if (!press) return;
-		var c = $('#editor-canvas').get(0);
-		var x = event.pageX - parseInt(c.style.left);
-		var y = event.pageY - parseInt(c.style.top);
+		let c = ids['editor-canvas'];
+		let x = event.pageX - parseInt(c.style.left);
+		let y = event.pageY - parseInt(c.style.top);
 		x /= game.TILE_WIDTH;
 		y /= game.TILE_HEIGHT;
 		x = Math.floor(x);
@@ -2685,8 +2590,8 @@ function editorHandleScreenEvent(event, press) {
 			//change the map!
 			//remove newlines
 			assertEquals(editor.levelData.length, 200);
-			var i = 2 * (x + game.MAP_WIDTH * y);
-			var sel = $('#editor-select').val();
+			let i = 2 * (x + game.MAP_WIDTH * y);
+			let sel = ids['editor-select'].value;
 			assertEquals(sel.length, 2);
 			editor.levelData = editor.levelData.substring(0, i)
 				+ sel
@@ -2696,12 +2601,12 @@ function editorHandleScreenEvent(event, press) {
 	}
 }
 
-var mouseIntervalMethod = 1;
-var mouseDownInterval;
-var lastMouseEvent;
+let mouseIntervalMethod = 1;
+let mouseDownInterval;
+let lastMouseEvent;
 function editorMouseEventHandler(event) {
-	if ($.mobile.activePage.get(0).id != 'game-page' &&
-		$.mobile.activePage.get(0).id != 'editor-page') return;
+	if (activePage != ids['game-page'] &&
+		activePage != ids['editor-page']) return;
 	//buttonSys.show();
 	//event.preventDefault();
 	lastMouseEvent = event;
@@ -2729,3 +2634,146 @@ function editorMouseEventHandler(event) {
 		}
 	}
 }
+
+/*
+canvas = ids['game-canvas'];
+canvas.disableSelection();
+glutil = new GLUtil({canvas:canvas.get(0)});
+gl = glutil.context;
+*/
+
+window.addEventListener('resize', onresize);
+Game.staticInit();
+GameNumbers.staticInit();
+
+let fontSize = 24;
+let buttonBorder = [.02, .04];
+let buttonSeparation = [.005, .01];
+let buttonSize = [.1, .2];
+buttonSys = new ButtonSys({
+	fontSize : fontSize,
+	callback : handleButtonCommand,
+	buttons : [
+		{
+			cmd:'left',
+			url:'icons/left.png',
+			bbox:new box2({
+				min:{x:buttonBorder[0], y:1-buttonBorder[1]-buttonSize[1]},
+				max:{x:buttonBorder[0]+buttonSize[0], y:1-buttonBorder[1]}
+			})
+		},
+		{
+			cmd:'down',
+			url:'icons/down.png',
+			bbox:new box2({
+				min:{x:buttonBorder[0]+buttonSize[0]+buttonSeparation[0], y:1-buttonBorder[1]-buttonSize[1]},
+				max:{x:buttonBorder[0]+2*buttonSize[0]+buttonSeparation[0], y:1-buttonBorder[1]}
+			})
+		},
+		{
+			cmd:'up',
+			url:'icons/up.png',
+			bbox:new box2({
+				min:{x:buttonBorder[0]+buttonSize[0]+buttonSeparation[0], y:1-buttonBorder[1]-buttonSize[1]*2-buttonSeparation[1]},
+				max:{x:buttonBorder[0]+2*buttonSize[0]+buttonSeparation[0], y:1-buttonBorder[1]-buttonSize[1]-buttonSeparation[1]}
+			})
+		},
+		{
+			cmd:'right',
+			url:'icons/right.png',
+			bbox:new box2({
+				min:{x:buttonBorder[0]+buttonSize[0]*2+buttonSeparation[0]*2, y:1-buttonBorder[1]-buttonSize[1]},
+				max:{x:buttonBorder[0]+3*buttonSize[0]+buttonSeparation[0]*2, y:1-buttonBorder[1]}
+			})
+		},
+		{
+			cmd:'fire',
+			url:'icons/ok.png',
+			bbox:new box2({
+				min:{x:1-buttonBorder[0]-buttonSize[0], y:1-buttonBorder[1]-buttonSize[1]},
+				max:{x:1-buttonBorder[0], y:1-buttonBorder[1]}
+			})
+		}
+	]
+});
+
+window.addEventListener('keydown', onkeydown)
+window.addEventListener('keyup', onkeyup)
+window.addEventListener('keypress', onkeypress)
+
+ids['editor-page'].addEventListener('mousedown', editorMouseEventHandler);
+ids['editor-page'].addEventListener('mousemove', editorMouseEventHandler);
+ids['editor-page'].addEventListener('mouseup', editorMouseEventHandler);
+
+//init globals
+anim = new Animation();
+
+//preload images
+let imgs = [];
+//tiles
+Game.prototype.mapTypes.forEach(mapType => {
+	imgs.push(mapType.bitmap.src);
+});
+//frames
+Animation.prototype.frames.forEach(frame => {
+	imgs.push(frame.bitmap.src);
+});
+//numbers
+GameNumbers.prototype.bitmaps.forEach(bitmap => {
+	imgs.push(bitmap.src);
+});
+//preload
+preload(imgs, () => {
+	//now make gl textures for all images
+	/*
+	imgs.forEach(img => {
+		img.tex = new glutil.Texture2D({
+			flipY : false,
+			dontPremultiplyAlpha : true,
+			data : img,
+			minFilter : gl.LINEAR,
+			magFilter : gl.LINEAR,
+			generateMipmap : true
+		});
+	});
+	*/
+
+	//if get params have a level, then just play it
+	const level = urlparams.get('level');
+	if (goodisfinite(level)) {
+		splash.start({level:parseInt(level)});
+	} else {
+		//otherwise, splash screen
+		splash.show();
+	}
+}, percent => {
+	ids.loading.value = parseInt(100*percent);
+});
+
+Object.entries({
+	startButton : {click : e => { splash.start(); }},
+	chooseLevelsButton : {click : e => { chooseLevels.show(); }},
+	helpButton : {click : e => { showHelp(); }},
+	levelPageMainMenuButton : {click : e => { splash.show(); }},
+	helpPageMainMenuButton : {click : e => { Game.prototype.close(); }},
+	helpPageMainMenuButton2 : {click : e => { Game.prototype.close(); }},
+	editorPageClose : {click : e => { splash.show(); }},
+	editorPagePlay : {click : e => { editor.play(); }},
+	editorPageSave : {click : e => { editor.save(); }},
+	editorPageSubmit : {click : e => { editor.submit(); }},
+	gamePageMenu : {click : e => { toggleHidden(ids.dropdown); }},
+	gamePageSkip : {click : e => { Game.prototype.skip(); }},
+	gamePageRestart : {click : e => { Game.prototype.restart(); }},
+	gamepad_checkbox : {change : e => { Game.prototype.gamepadToggle(); }},
+	gamePageEdit : {click : e => { editor.edit(); }},
+	gamePageClose : {click : e => { Game.prototype.close(); }},
+}).forEach(entry => {
+	const [id, handlers] = entry;
+	const obj = assertExists(ids, id);
+	Object.entries(handlers).forEach(entry => {
+		const [name, func] = entry;
+		obj.addEventListener(name, func);
+	});
+});
+
+update();
