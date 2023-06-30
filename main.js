@@ -2355,18 +2355,22 @@ var Editor = makeClass(new (function(){
 		var name = prompt('whats your name?');
 		if (!name) return;
 		$.ajax({
-			url:'submit.lua',
+			url:'submit.js.lua',
+			method:'GET',
+			dataType:'json',
 			data:{
 				name:name,
 				tiles:this.levelData//$('#editor-textarea').val()
 			}
 		})
-		/* jquery is always interpreting this as a fail, even if it gets a json win message back
+		// jquery is always interpreting this as a fail, even if it gets a json win message back
 		.done(function() {
-			alert('win');
+			console.log('submit.lua done', arguments);
+			//alert('win');
 		}).fail(function() {
-			alert('something went terribly wrong');
-		})*/;
+			console.log('submit.lua fail', arguments);
+			//alert('something went terribly wrong');
+		});
 	};
 })());
 
