@@ -1,4 +1,4 @@
-import {getIDs, DOM, removeFromParent, arrayClone, hide, show, hidden, toggleHidden, assertExists, preload} from '/js/util.js';
+import {getIDs, DOM, removeFromParent, arrayClone, hide, show, hidden, toggleHidden, assertExists, assertEquals, preload} from '/js/util.js';
 import {box2} from '/js/vec.js';
 import {ButtonSys} from './buttons.js';
 
@@ -2571,17 +2571,17 @@ function onkeyup(event) {
 	event.preventDefault();
 }
 
-function onkeypress(event) {
+function onkeypress(e) {
 	if (activePage != ids['game-page']) return;
-	event.preventDefault();
+	e.preventDefault();
 }
 
-function editorHandleScreenEvent(event, press) {
+const editorHandleScreenEvent = (e, press, read) => {
 	if (activePage == ids['editor-page']) {
 		if (!press) return;
 		let c = ids['editor-canvas'];
-		let x = event.pageX - parseInt(c.style.left);
-		let y = event.pageY - parseInt(c.style.top);
+		let x = e.pageX - parseInt(c.style.left);
+		let y = e.pageY - parseInt(c.style.top);
 		x /= game.TILE_WIDTH;
 		y /= game.TILE_HEIGHT;
 		x = Math.floor(x);
@@ -2593,26 +2593,30 @@ function editorHandleScreenEvent(event, press) {
 			let i = 2 * (x + game.MAP_WIDTH * y);
 			let sel = ids['editor-select'].value;
 			assertEquals(sel.length, 2);
-			editor.levelData = editor.levelData.substring(0, i)
-				+ sel
-				+ editor.levelData.substring(i+2);
-			editor.refresh();
+			if (!read) {
+				editor.levelData = editor.levelData.substring(0, i)
+					+ sel
+					+ editor.levelData.substring(i+2);
+				editor.refresh();
+			} else {
+				ids['editor-select'].value = editor.levelData.substring(i, i+2);
+			}
 		}
 	}
-}
+};
 
 let mouseIntervalMethod = 1;
 let mouseDownInterval;
 let lastMouseEvent;
-function editorMouseEventHandler(event) {
+const editorMouseEventHandler = (e) => {
 	if (activePage != ids['game-page'] &&
 		activePage != ids['editor-page']) return;
 	//buttonSys.show();
-	//event.preventDefault();
-	lastMouseEvent = event;
-	if (event.type == 'mousedown') {
+	//e.preventDefault();
+	lastMouseEvent = e;
+	if (e.type == 'mousedown') {
 		if (mouseIntervalMethod == 0) {
-			editorHandleScreenEvent(lastMouseEvent, true);
+			editorHandleScreenEvent(lastMouseEvent, true, e.shiftKey);
 		} else {
 			if (mouseDownInterval !== undefined) {
 				if (mouseIntervalMethod == 1) {
@@ -2621,19 +2625,19 @@ function editorMouseEventHandler(event) {
 					return;
 				}
 			}
-			editorHandleScreenEvent(lastMouseEvent, true);
-			mouseDownInterval = setInterval(function() {
-				editorHandleScreenEvent(lastMouseEvent, true);
+			editorHandleScreenEvent(lastMouseEvent, true, e.shiftKey);
+			mouseDownInterval = setInterval(() => {
+				editorHandleScreenEvent(lastMouseEvent, true, e.shiftKey);
 			}, 50);
 		}
-	} else if (event.type == 'mouseup') {
-		editorHandleScreenEvent(lastMouseEvent, false);
+	} else if (e.type == 'mouseup') {
+		editorHandleScreenEvent(lastMouseEvent, false, e.shiftKey);
 		if (mouseIntervalMethod != 0) {
 			if (mouseDownInterval !== undefined) clearInterval(mouseDownInterval);
 			mouseDownInterval = undefined;
 		}
 	}
-}
+};
 
 /*
 canvas = ids['game-canvas'];
