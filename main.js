@@ -1807,7 +1807,7 @@ this.levelData = levelData;
 							this.objs.push(sentry);
 						} else if (ch == '.') {	//empty
 						} else {
-							console.log('found unknown '+ch);
+							console.log('found unknown', ch);
 						}
 					}
 				}
@@ -2139,22 +2139,21 @@ Game.prototype.TILE_HEIGHT = 24;
 //out of bound tiles are considered...
 Game.prototype.MAPTYPE_OOB = Game.prototype.MAPTYPE_STONE;
 
-function refreshLevels(done) {
-	fetch('levels.json')
-	.then(response => {
+const refreshLevels = () => {
+	return fetch('levels.json', {
+		cache : 'reload'
+	}).then(response => {
 		if (!response.ok) return Promise.reject('not ok');
-		response.json()
-		.then(d => {
-			levelDB = d.levels;
-			if (done) done();
-		});
-	})
-	.catch(e => {
+		return response.json();
+	}).then(d => {
+		levelDB = d.levels;
+	}).catch(e => {
 		alert('failed to load levels!');
 	});
-}
+};
 
-function refreshUserLevels(done) {
+const refreshUserLevels = () => {
+	// get our levels
 	thisUserLevelDB = localStorage.getItem('thisUserLevelDB') || undefined;
 	if (thisUserLevelDB !== undefined) {
 		thisUserLevelDB = JSON.parse(thisUserLevelDB);
@@ -2162,28 +2161,27 @@ function refreshUserLevels(done) {
 		thisUserLevelDB = [];
 	}
 
-	fetch('userlevels.json')
+	// get remove levels
+	return fetch('userlevels.json', {
+		cache : 'reload'
+	})
 	.then(response => {
 		if (!response.ok) return Promise.reject('not ok');
-		response.json()
-		.then(d => {
-			allUsersLevelDB = d.levels;
-		});
+		return response.json();
+	}).then(d => {
+		allUsersLevelDB = d.levels;
 	}).catch(e =>{
 		console.log('failed to load user levels!');
-	})
-	.finally(() => {
-		if (done) done();
 	});
-}
+};
 
-function saveUserLevels() {
+const saveUserLevels = () => {
 	if (thisUserLevelDB !== undefined && thisUserLevelDB.length > 0) {
 		localStorage.setItem('thisUserLevelDB', JSON.stringify(thisUserLevelDB));
 	} else {
 		localStorage.removeItem('thisUserLevelDB');
 	}
-}
+};
 
 class Splash {
 	show() {
@@ -2201,7 +2199,8 @@ class Splash {
 		if (args.level === undefined) {
 			args.level = 0;
 		}
-		refreshLevels(() => {
+		refreshLevels()
+		.then(() => {
 			args.canvas = ids['game-canvas'];
 			game = new Game(args);
 			hide(ids.dropdown);
@@ -2218,106 +2217,111 @@ class ChooseLevels {
 		changePage('level-page');
 		this.refresh();
 	}
-	refresh(done) {
+	
+	refresh() {
 		let thiz = this;
 		ids['level-page-content'].innerHTML = '';
-		refreshLevels(() => {
-			refreshUserLevels(() => {
-				let dbs = [levelDB];	//better be there
-				if (thisUserLevelDB !== undefined && thisUserLevelDB.length > 0) dbs.push(thisUserLevelDB);	//might be there
-				if (allUsersLevelDB !== undefined && allUsersLevelDB.length > 0) dbs.push(allUsersLevelDB);	//might be there
-				dbs.forEach(db => {
+		
+		return refreshLevels()
+		.then(() => {
+			return refreshUserLevels();
+		})
+		.then(() => {
+console.log('refreshing levels');				
+			let dbs = [levelDB];	//better be there
+			if (thisUserLevelDB !== undefined && thisUserLevelDB.length > 0) dbs.push(thisUserLevelDB);	//might be there
+			if (allUsersLevelDB !== undefined && allUsersLevelDB.length > 0) dbs.push(allUsersLevelDB);	//might be there
+			dbs.forEach(db => {
 
-					if (db == allUsersLevelDB && db.length > 0) {
-						DOM('br', {appendTo:ids['level-page-content']});
-						DOM('br', {appendTo:ids['level-page-content']});
-						DOM('div', {text:'User Submitted Levels:', appendTo:ids['level-page-content']});
-					} else if (db == thisUserLevelDB && db.length > 0) {
-						DOM('br', {appendTo:ids['level-page-content']});
-						DOM('br', {appendTo:ids['level-page-content']});
-						DOM('div', {text:'Your Levels:', appendTo:ids['level-page-content']});
-					}
+				if (db == allUsersLevelDB && db.length > 0) {
+					DOM('br', {appendTo:ids['level-page-content']});
+					DOM('br', {appendTo:ids['level-page-content']});
+					DOM('div', {text:'User Submitted Levels:', appendTo:ids['level-page-content']});
+				} else if (db == thisUserLevelDB && db.length > 0) {
+					DOM('br', {appendTo:ids['level-page-content']});
+					DOM('br', {appendTo:ids['level-page-content']});
+					DOM('div', {text:'Your Levels:', appendTo:ids['level-page-content']});
+				}
 
-					db.forEach((levelData, i) => {
-						let levelNumber = i;
-						if (db !== levelDB) levelNumber = -1;
-						//set canvas global
-						let chooseCanvas = DOM('canvas', {
+				db.forEach((levelData, i) => {
+					let levelNumber = i;
+					if (db !== levelDB) levelNumber = -1;
+					//set canvas global
+					let chooseCanvas = DOM('canvas', {
+						css : {
+							padding:'10px',
+							cursor:'pointer'
+						},
+						click : e => {
+							console.log(levelNumber, levelData.tiles);
+							splash.start({
+								level:levelNumber,
+								levelData:levelData.tiles
+							});
+						},
+						attrs : {
+							width : 200,
+							height : 200,
+						},
+						appendTo : ids['level-page-content'],
+					});
+
+					if (db == thisUserLevelDB) {
+						DOM('img', {
+							src : 'images/cross.png',
 							css : {
-								padding:'10px',
+								verticalAlign:'top',
 								cursor:'pointer'
 							},
 							click : e => {
-								console.log(levelNumber, levelData.tiles);
-								splash.start({
-									level:levelNumber,
-									levelData:levelData.tiles
+								thisUserLevelDB.splice(i,1);
+								saveUserLevels();
+								let t = document.body.scrollTop;
+								thiz.refresh()
+								.then(() => {
+									document.body.scrollTop = t;
 								});
 							},
-							attrs : {
-								width : 200,
-								height : 200,
+							appendTo:ids['level-page-content'],
+						});
+
+						DOM('img', {
+							src : 'images/pencil.png',
+							css : {
+								cursor:'pointer',
+								paddingRight:'10px'
 							},
-							appendTo : ids['level-page-content'],
+							click : function() {
+								editor.levelData = levelData.tiles;
+								editor.customLevelIndex = i;
+								editor.show();
+							},
+							appendTo:ids['level-page-content'],
 						});
 
-						if (db == thisUserLevelDB) {
-							DOM('img', {
-								src : 'images/cross.png',
-								css : {
-									verticalAlign:'top',
-									cursor:'pointer'
-								},
-								click : e => {
-									thisUserLevelDB.splice(i,1);
-									saveUserLevels();
-									let t = document.body.scrollTop;
-									thiz.refresh(function() {
-										document.body.scrollTop = t;
-									});
-								},
-								appendTo:ids['level-page-content'],
-							});
+					}
 
-							DOM('img', {
-								src : 'images/pencil.png',
-								css : {
-									cursor:'pointer',
-									paddingRight:'10px'
-								},
-								click : function() {
-									editor.levelData = levelData.tiles;
-									editor.customLevelIndex = i;
-									editor.show();
-								},
-								appendTo:ids['level-page-content'],
-							});
-
-						}
-
-						//and now do a single draw...
-						game = new Game({
-							frozen:true,
-							levelData:levelData.tiles,
-							canvas:chooseCanvas,
-							dontResize:true
-						});
-						game.draw();
-						game.removeAll();
-
-						if (db == levelDB && localStorage.getItem('completed'+i) == '1') {
-							let c = chooseCanvas.getContext('2d');
-							c.globalAlpha = .5;
-							c.fillStyle = '#fff';
-							c.fillRect(0,0,game.canvas.width,game.canvas.height);
-							c.globalAlpha = 1;
-						}
+					//and now do a single draw...
+					game = new Game({
+						frozen:true,
+						levelData:levelData.tiles,
+						canvas:chooseCanvas,
+						dontResize:true
 					});
+					game.draw();
+					game.removeAll();
 
+					if (db == levelDB && localStorage.getItem('completed'+i) == '1') {
+						let c = chooseCanvas.getContext('2d');
+						c.globalAlpha = .5;
+						c.fillStyle = '#fff';
+						c.fillRect(0,0,game.canvas.width,game.canvas.height);
+						c.globalAlpha = 1;
+					}
 				});
-				game = undefined;
-				if (done) done();
+
 			});
+			game = undefined;
 		});
 	}
 }
@@ -2388,15 +2392,33 @@ class Editor {
 	submit() {
 		let name = prompt('whats your name?');
 		if (!name) return;
-		fetch('submit.lua', {
+		
+		const params = new URLSearchParams();
+		params.set('name', name);
+		params.set('tiles', this.levelData);
+		params.set('unique', Date.now());	// cuz I never trust browser caching
+
+		const page = 'submit.json.lua'
+		fetch(page
+			+'?'+params,	// GET
+		{
+			cache : 'reload'
+		/*			// POST
 			data:{
 				name:name,
-				tiles:this.levelData//ids['editor-textarea'].value,
-			},
+				tiles:this.levelData,
+			}
+		}*/
+		})
+		.then(d => {
+			console.log('submit.json.lua done', d);
+			return d.json();
+		}).then(d => {
+			console.log('submit.json.lua json', d);
 		});
 		/* jquery is always interpreting this as a fail, even if it gets a json win message back
 		.done(function() {
-			console.log('submit.lua done', arguments);
+			console.log('submit.json.lua done', arguments);
 			//alert('win');
 		}).fail(function() {
 			alert('something went terribly wrong');
