@@ -1,4 +1,4 @@
-import {getIDs, DOM, removeFromParent, arrayClone, hide, show, hidden, toggleHidden, assertExists, assertEquals, preload} from '/js/util.js';
+import {getIDs, DOM, removeFromParent, arrayClone, hide, show, hidden, toggleHidden, assert, assertExists, assertEquals, preload} from '/js/util.js';
 import {box2} from '/js/vec.js';
 import {ButtonSys} from './buttons.js';
 
@@ -7,26 +7,26 @@ window.ids = ids;
 
 const urlparams = new URLSearchParams(window.location.search);
 
-function goodisfinite(x) {
+const goodisfinite = (x) => {
 	return typeof(x) == 'number' &&
 		!isNaN(x) &&
 		x !== Infinity &&
 		x !== -Infinity;
-}
+};
 
 //TODO just use class=page?
-function hideAllPages() {
+const hideAllPages = () => {
 	document.querySelectorAll('[class="page"]').forEach(page => {
 		hide(page);
 	});
-}
+};
 
 let activePage;
-function changePage(id) {
+const changePage = (id) => {
 	hideAllPages();
 	activePage = ids[id];
 	show(ids[id]);
-}
+};
 
 let canvas, glutil, gl;
 
@@ -2374,6 +2374,8 @@ class Editor {
 	save() {
 		//if we have a current entry in the user levels then replace it...
 		console.log("saving custom index",this.customLevelIndex);
+		console.log("tile data");
+		console.log(this.levelData);
 		if (this.customLevelIndex !== -1) {
 			assert(this.customLevelIndex >= 0 && this.customLevelIndex < thisUserLevelDB.length);
 			thisUserLevelDB[this.customLevelIndex] = {tiles:this.levelData};
