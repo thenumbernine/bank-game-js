@@ -2144,7 +2144,16 @@ const refreshLevels = () => {
 		cache : 'reload'
 	}).then(response => {
 		if (!response.ok) return Promise.reject('not ok');
-		return response.json();
+		return response.text();
+	}).then(d => {
+		// fucking genius javascript upon error of response.json() parsing will just throw it all the fuck away and let you guess what's wrong.  why do idiots run the W3C?
+		try {
+			return JSON.parse(d);
+		} catch (e) {
+			console.log('for text', d);
+			console.log('got error', e);
+			throw e;
+		}
 	}).then(d => {
 		levelDB = d.levels;
 	}).catch(e => {
@@ -2167,7 +2176,16 @@ const refreshUserLevels = () => {
 	})
 	.then(response => {
 		if (!response.ok) return Promise.reject('not ok');
-		return response.json();
+		return response.text();
+	}).then(d => {
+		// fucking genius javascript upon error of response.json() parsing will just throw it all the fuck away and let you guess what's wrong.  why do idiots run the W3C?
+		try {
+			return JSON.parse(d);
+		} catch (e) {
+			console.log('for text', d);
+			console.log('got error', e);
+			throw e;
+		}
 	}).then(d => {
 		allUsersLevelDB = d.levels;
 	}).catch(e =>{
@@ -2412,7 +2430,17 @@ class Editor {
 		})
 		.then(d => {
 			console.log('submit.json.lua done', d);
-			return d.json();
+			return d.text();
+		}).then(d => {
+			// fucking genius javascript upon error of response.json() parsing will just throw it all the fuck away and let you guess what's wrong.  why do idiots run the W3C?
+			try {
+				return JSON.parse(d);
+			} catch (e) {
+				console.log('for text', d);
+				console.log('got error', e);
+				throw e;
+			}
+	
 		}).then(d => {
 			console.log('submit.json.lua json', d);
 		});
