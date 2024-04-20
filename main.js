@@ -2417,8 +2417,9 @@ class Editor {
 		params.set('unique', Date.now());	// cuz I never trust browser caching
 
 		const page = 'submit.json.lua'
-		fetch(page
-			+'?'+params,	// GET
+		const url = page+'?'+params;
+console.log('url', url);		
+		fetch(url,	// GET
 		{
 			cache : 'reload'
 		/*			// POST
