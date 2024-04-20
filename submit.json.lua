@@ -1,7 +1,7 @@
 <?
+assert(xpcall(function()
 headers['connection'] = 'close'	 -- chrome bug
 headers["cache-control"] = 'no-cache'
-
 -- I think the new openresty->wsapi loses GET and POST
 local path = require 'ext.path'
 local json = require 'dkjson'
@@ -36,3 +36,8 @@ leveldb = leveldb or {levels={}}
 table.insert(leveldb.levels, {name=name, tiles=tiles})
 assert(path(fn):write((assert(json.encode(leveldb, {indent=true})))))
 ?><?=json.encode{result='win'}?><?
+end, function(err)
+	?><?=json.encode{error=err}?><?
+	return err..'\n'..debug.traceback()
+end))
+?>
