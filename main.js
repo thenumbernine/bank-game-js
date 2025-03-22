@@ -1,4 +1,5 @@
-import {getIDs, DOM, removeFromParent, arrayClone, hide, show, hidden, toggleHidden, assert, assertExists, assertEquals, preload} from '/js/util.js';
+import {appendChildren, Br, Canvas, Div, Img} from '/js/dom.js';
+import {getIDs, removeFromParent, arrayClone, hide, show, hidden, toggleHidden, assert, assertExists, assertEquals, preload} from '/js/util.js';
 import {box2} from '/js/vec.js';
 import {ButtonSys} from './buttons.js';
 
@@ -95,7 +96,7 @@ class Animation {
 
 		for (let i = 0; i < this.frames.length; i++) {
 			let frame = this.frames[i];
-			frame.bitmap = DOM('img', {src:'res/drawable/'+frame.bitmapId+'.png'});
+			frame.bitmap = Img({src:'res/drawable/'+frame.bitmapId+'.png'});
 		}
 	}
 
@@ -215,7 +216,7 @@ Animation.prototype.frames = [
 class GameNumbers {
 	static staticInit() {
 		for (let i = 0; i < 10; i++) {
-			GameNumbers.prototype.bitmaps.push(DOM('img', {src:'res/drawable/'+i+'.png'}));
+			GameNumbers.prototype.bitmaps.push(Img({src:'res/drawable/'+i+'.png'}));
 		}
 	}
 	draw(c, rect, n, x, y) {
@@ -243,8 +244,8 @@ GameNumbers.prototype.bitmaps = [];
 
 /*
 function GameText() {
-	this.span = DOM('span', {
-		css:{
+	this.span = Span({
+		style:{
 			position:'absolute',
 			zIndex:1
 		}
@@ -1621,7 +1622,7 @@ class Game {
 		const thiz = Game.prototype;
 		for (let i = 0; i < thiz.tileBitmapIds.length; i++) {
 			thiz.mapTypes[i].typeIndex = i;
-			thiz.mapTypes[i].bitmap = DOM('img', {src:'res/drawable/'+thiz.mapTypes[i].bitmapId+'.png'});
+			thiz.mapTypes[i].bitmap = Img({src:'res/drawable/'+thiz.mapTypes[i].bitmapId+'.png'});
 		}
 	}
 
@@ -1706,7 +1707,7 @@ class Game {
 			}
 		}
 
-		this.bitmapButtonBomb = DOM('img', {src:'res/drawable/button_bomb.png'});
+		this.bitmapButtonBomb = Img({src:'res/drawable/button_bomb.png'});
 
 		//don't load the level just yet
 		//first give the obj we are given to (i.e. the activity?) a chance to change the level or what not
@@ -2252,30 +2253,38 @@ console.log('refreshing levels');
 			dbs.forEach(db => {
 
 				if (db == allUsersLevelDB && db.length > 0) {
-					DOM('br', {appendTo:ids['level-page-content']});
-					DOM('br', {appendTo:ids['level-page-content']});
-					DOM('div', {text:'User Submitted Levels:', appendTo:ids['level-page-content']});
+					appendChildren(
+						ids['level-page-content'],
+						Br(),
+						Br(),
+						Div({innerText:'User Submitted Levels:'})
+					);
 				} else if (db == thisUserLevelDB && db.length > 0) {
-					DOM('br', {appendTo:ids['level-page-content']});
-					DOM('br', {appendTo:ids['level-page-content']});
-					DOM('div', {text:'Your Levels:', appendTo:ids['level-page-content']});
+					appendChildren(
+						ids['level-page-content'],
+						Br(),
+						Br(),
+						Div({innerText:'Your Levels:'})
+					);
 				}
 
 				db.forEach((levelData, i) => {
 					let levelNumber = i;
 					if (db !== levelDB) levelNumber = -1;
 					//set canvas global
-					let chooseCanvas = DOM('canvas', {
-						css : {
+					let chooseCanvas = Canvas({
+						style : {
 							padding:'10px',
 							cursor:'pointer'
 						},
-						click : e => {
-							console.log(levelNumber, levelData.tiles);
-							splash.start({
-								level:levelNumber,
-								levelData:levelData.tiles
-							});
+						events : {
+							click : e => {
+								console.log(levelNumber, levelData.tiles);
+								splash.start({
+									level:levelNumber,
+									levelData:levelData.tiles
+								});
+							},
 						},
 						attrs : {
 							width : 200,
@@ -2285,34 +2294,38 @@ console.log('refreshing levels');
 					});
 
 					if (db == thisUserLevelDB) {
-						DOM('img', {
+						Img({
 							src : 'images/cross.png',
-							css : {
+							style : {
 								verticalAlign:'top',
 								cursor:'pointer'
 							},
-							click : e => {
-								thisUserLevelDB.splice(i,1);
-								saveUserLevels();
-								let t = document.body.scrollTop;
-								thiz.refresh()
-								.then(() => {
-									document.body.scrollTop = t;
-								});
+							events : {
+								click : e => {
+									thisUserLevelDB.splice(i,1);
+									saveUserLevels();
+									let t = document.body.scrollTop;
+									thiz.refresh()
+									.then(() => {
+										document.body.scrollTop = t;
+									});
+								},
 							},
 							appendTo:ids['level-page-content'],
 						});
 
-						DOM('img', {
+						Img({
 							src : 'images/pencil.png',
-							css : {
+							style : {
 								cursor:'pointer',
 								paddingRight:'10px'
 							},
-							click : function() {
-								editor.levelData = levelData.tiles;
-								editor.customLevelIndex = i;
-								editor.show();
+							events : {
+								click : function() {
+									editor.levelData = levelData.tiles;
+									editor.customLevelIndex = i;
+									editor.show();
+								},
 							},
 							appendTo:ids['level-page-content'],
 						});

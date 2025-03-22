@@ -1,4 +1,5 @@
-import {DOM, assertExists, hide, show} from '/js/util.js';
+import {Div} from '/js/dom.js';
+import {assertExists, hide, show} from '/js/util.js';
 import {box2} from '/js/vec.js';
 
 //touch screen stuff
@@ -12,8 +13,8 @@ class Button {
 		this.url = args.url;
 		let fontSize = args.fontSize || 24;
 		let callback = assertExists(args, 'callback');
-		this.dom = DOM('div', {
-			css:{
+		this.dom = Div({
+			style:{
 				backgroundColor:'rgb(255,255,255)',
 				position:'absolute',
 				textAlign:'center',
