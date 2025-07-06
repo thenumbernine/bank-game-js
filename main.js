@@ -1053,9 +1053,7 @@ class Bomb extends PushableObj {
 						//if a flame is even half a block off from an obj then it won't be hit
 						//...except for the player
 						//TODO - class-based let?
-						if (o instanceof Player && dist > .75) {
-						} else if (dist > .25) {
-						} else {
+						if (dist <= (o instanceof Player ? .75 : .25)) {
 							o.onTouchFlames();
 							if (o.blocksExplosion) hit = true;
 						}
