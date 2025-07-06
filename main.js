@@ -656,7 +656,7 @@ class PushableObj extends MovableObj {
 				case this.MOVE_RESPONSE_WAS_BLOCKED:
 					return true;
 				case this.MOVE_RESPONSE_DID_MOVE:
-					return true;	//? false? superResult?
+					return false;
 				}
 			}
 		}
